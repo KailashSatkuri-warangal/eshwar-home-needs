@@ -38,13 +38,21 @@ export async function predictScrapMaterial(
     try {
       console.log('Calling live Gemini API for scrap prediction...');
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
       // Build context for AI about pricing and parameters
       const prompt = `
         You are ESHwar Home Needs AI Scrap Assistant. Analyze this image of scrap material.
         
-        Inputs from the user (use as hints but trust what you see in the image):
+        CRITICAL METAL IDENTIFICATION CRITERIA:
+        - BRASS: Look for yellow-gold, yellowish-brown, or dull gold colored metal. Tends to tarnish to a dull brownish-green. Typical items are water taps, plumbing fittings, statues, urlis, brass plates, decorative items, or electrical brass pins.
+        - COPPER: Look for distinct reddish-brown, copper-red, or shiny salmon-pink/red metallic color. Typical items are stripped or bundled electrical wires/cables, copper water bottles, jugs, pipes, or cooking pots.
+        - STAINLESS STEEL: Look for clean shiny silver, bright metallic chrome, or dull grey/silver surfaces. Does not have rust. Typical items are kitchen plates, topes, bowls, spoons, tumblers.
+        - STEEL / IRON: Look for dark grey, dull silver, or black metal, heavily prone to orange-brown rust. Typical items are iron bars, construction scrap, heavy machinery parts, or rusted pipes.
+        - ALUMINIUM: Look for very light-grey, dull silver-white metal that is rust-free. Typical items are soda cans, ladder frames, window frames, or cast cookware (like pressure cookers).
+        - PLASTIC: Look for colored, lightweight, non-metallic containers, bottles, crates, toys, or pipes.
+
+        Inputs from the user (use as hints but trust the image visual characteristics first):
         - User stated material: ${userSelectedMaterial || 'Unknown'}
         - User estimated weight: ${userEstimatedWeight ? `${userEstimatedWeight} kg` : 'Unknown'}
         - User stated condition: ${userCondition || 'Unknown'}

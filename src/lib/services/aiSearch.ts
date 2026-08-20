@@ -21,7 +21,7 @@ export async function parseNaturalLanguageSearch(query: string): Promise<Structu
     try {
       console.log(`Calling Gemini API to parse query: "${query}"`);
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
       const prompt = `
         You are an e-commerce database query translation assistant.

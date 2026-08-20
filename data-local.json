@@ -936,7 +936,86 @@
   ],
   "orders": [],
   "quotes": [],
-  "scrapRequests": [],
+  "scrapRequests": [
+    {
+      "id": "scrp_test_brass",
+      "userId": "IvhopGxnCcPRwOtWuB0t1njzCw72",
+      "customerDetails": {
+        "name": "Ramu Scrap Seller",
+        "phone": "9900011223",
+        "email": "scrap_seller@eshwarhomeneeds.com",
+        "address": {
+          "name": "Ramu Scrap Seller",
+          "street": "Flat 302, Green Glen Layout",
+          "city": "Hanumakonda",
+          "state": "Telangana",
+          "pincode": "506001",
+          "phone": "9900011223"
+        }
+      },
+      "material": "brass",
+      "estimatedWeight": 12,
+      "condition": "good",
+      "status": "REQUESTED",
+      "preferredDate": "2026-08-22",
+      "preferredTime": "10:00 - 13:00",
+      "notes": "Old brass plates and puja items.",
+      "createdAt": "2026-08-20T04:14:49.437Z",
+      "updatedAt": "2026-08-20T04:14:49.437Z"
+    },
+    {
+      "id": "scrp_test_copper",
+      "userId": "IvhopGxnCcPRwOtWuB0t1njzCw72",
+      "customerDetails": {
+        "name": "Ramu Scrap Seller",
+        "phone": "9900011223",
+        "email": "scrap_seller@eshwarhomeneeds.com",
+        "address": {
+          "name": "Ramu Scrap Seller",
+          "street": "Flat 302, Green Glen Layout",
+          "city": "Hanumakonda",
+          "state": "Telangana",
+          "pincode": "506001",
+          "phone": "9900011223"
+        }
+      },
+      "material": "copper",
+      "estimatedWeight": 8,
+      "condition": "clean",
+      "status": "SCHEDULED",
+      "preferredDate": "2026-08-23",
+      "preferredTime": "14:00 - 17:00",
+      "notes": "Stripped electrical cables from renovation.",
+      "createdAt": "2026-08-20T04:14:49.437Z",
+      "updatedAt": "2026-08-20T04:14:49.437Z"
+    },
+    {
+      "id": "scrp_test_aluminium",
+      "userId": "cMJGh9CG2vWfYl9Q6h2u486tHL43",
+      "customerDetails": {
+        "name": "Retail Customer (B2C)",
+        "phone": "9888877777",
+        "email": "retail_customer@eshwarhomeneeds.com",
+        "address": {
+          "name": "Retail Customer (B2C)",
+          "street": "HNO 4-2-192, Subedari",
+          "city": "Hanumakonda",
+          "state": "Telangana",
+          "pincode": "506001",
+          "phone": "9888877777"
+        }
+      },
+      "material": "aluminium",
+      "estimatedWeight": 15,
+      "condition": "damaged",
+      "status": "REQUESTED",
+      "preferredDate": "2026-08-24",
+      "preferredTime": "10:00 - 13:00",
+      "notes": "Old aluminium pressure cookers and partition frames.",
+      "createdAt": "2026-08-20T04:14:49.437Z",
+      "updatedAt": "2026-08-20T04:14:49.437Z"
+    }
+  ],
   "users": [
     {
       "uid": "admin_demo_account",

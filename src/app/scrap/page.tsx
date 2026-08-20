@@ -7,7 +7,6 @@ import ScrapRatesBoard from '@/components/ui/ScrapRatesBoard';
 import { MOCK_SCRAP_RATES } from '@/lib/mockData';
 import { useApp } from '@/context/AppContext';
 import { ScrapMaterialType, ScrapStatus, ScrapRequest } from '@/types';
-import { predictScrapMaterial } from '@/lib/services/aiScrap';
 import { db } from '@/lib/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
 import { 
@@ -87,13 +86,23 @@ export default function ScrapPage() {
     setAiPredicting(true);
     try {
       const mime = imageFile?.type || 'image/jpeg';
-      const result = await predictScrapMaterial(
-        imagePreview,
-        mime,
-        material,
-        estimatedWeight,
-        condition
-      );
+      const response = await fetch('/api/ai/predict-scrap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: imagePreview,
+          mimeType: mime,
+          material,
+          estimatedWeight,
+          condition
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Server returned error status');
+      }
+
+      const result = await response.json();
 
       setAiResult(result);
       
