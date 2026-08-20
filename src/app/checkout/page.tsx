@@ -1,0 +1,578 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Navbar from '@/components/ui/Navbar';
+import Footer from '@/components/ui/Footer';
+import { useApp } from '@/context/AppContext';
+import { Order, OrderItem, Address } from '@/types';
+import { setDbDoc } from '@/lib/services/db';
+import { generateInvoicePDF } from '@/lib/services/invoice';
+import { CheckCircle2, CreditCard, Truck, Landmark, RotateCw, FileText, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+
+export default function CheckoutPage() {
+  const { cart, user, clearCart, showToast } = useApp();
+  const [loading, setLoading] = useState(false);
+  const [orderCreated, setOrderCreated] = useState<Order | null>(null);
+
+  // Form Fields
+  const [name, setName] = useState(user?.displayName || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [gstin, setGstin] = useState(user?.gstin || '');
+  
+  // Address Fields
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('Hanumakonda');
+  const [state, setState] = useState('Telangana');
+  const [pincode, setPincode] = useState('');
+
+  // Payment Selection
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE' | 'NEFT_RTGS'>('COD');
+
+  // Set default details if user loaded
+  useEffect(() => {
+    if (user) {
+      setName(user.displayName);
+      setEmail(user.email);
+      if (user.phone) setPhone(user.phone);
+      if (user.gstin) setGstin(user.gstin);
+      if (user.shippingAddress) {
+        setStreet(user.shippingAddress.street);
+        setCity(user.shippingAddress.city);
+        setState(user.shippingAddress.state);
+        setPincode(user.shippingAddress.pincode);
+      }
+    }
+  }, [user]);
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.items.length === 0) return;
+
+    if (!street || !pincode || !phone) {
+      showToast('Please fill all required delivery details.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const orderId = `ord_${Math.random().toString(36).substring(2, 9)}`;
+      const shippingAddress: Address = { name, street, city, state, pincode, phone };
+      const billingAddress: Address = { name, street, city, state, pincode, phone };
+
+      // Convert CartItems to OrderItems
+      const orderItems: OrderItem[] = cart.items.map((item) => {
+        const itemSubtotal = item.price * item.quantity;
+        const baseValue = itemSubtotal / (1 + item.gstRate / 100);
+        const taxValue = itemSubtotal - baseValue;
+
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          name: item.name,
+          sku: item.sku,
+          price: item.price,
+          quantity: item.quantity,
+          unit: item.unit,
+          gstRate: item.gstRate,
+          gstAmount: taxValue,
+          hsnCode: item.hsnCode,
+          total: itemSubtotal,
+        };
+      });
+
+      const newOrder: Order = {
+        id: orderId,
+        userId: user?.uid || 'guest_checkout',
+        customerDetails: {
+          name,
+          email,
+          phone,
+          ...(gstin.trim() ? { gstin: gstin.toUpperCase() } : {}),
+          billingAddress,
+          shippingAddress,
+        },
+        items: orderItems,
+        subtotal: cart.subtotal,
+        discount: cart.discount,
+        gst: cart.gst,
+        deliveryCharge: cart.deliveryCharge,
+        grandTotal: cart.grandTotal,
+        status: 'PLACED',
+        paymentDetails: {
+          method: paymentMethod,
+          status: paymentMethod === 'ONLINE' ? 'SUCCESS' : 'PENDING',
+          ...(paymentMethod === 'ONLINE' ? { transactionId: `txn_${Math.random().toString(36).substring(2, 9)}` } : {}),
+        },
+        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+        updatedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+      };
+
+      const executeDatabaseWrites = async (finalOrder: Order) => {
+        // 1. Create order record
+        await setDbDoc('orders', orderId, finalOrder);
+
+        // 2. Create notifications alerts
+        const notificationId = `notif_${Math.random().toString(36).substring(2, 9)}`;
+        const notifData = {
+          id: notificationId,
+          recipientId: 'admin',
+          title: 'New Order Placed',
+          message: `Customer ${name} placed order ${orderId.toUpperCase()} for ₹${cart.grandTotal.toFixed(0)}.`,
+          type: 'order',
+          read: false,
+          createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+        };
+        await setDbDoc('notifications', notificationId, notifData);
+
+        // Trigger Confetti locally for premium UX
+        try {
+          const confetti = (await import('canvas-confetti')).default;
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        } catch (err) {
+          console.error(err);
+        }
+
+        setOrderCreated(finalOrder);
+        clearCart();
+        showToast('Order placed successfully!', 'success');
+      };
+
+      if (paymentMethod === 'ONLINE') {
+        const res = await fetch('/api/payment/razorpay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: cart.grandTotal, receipt: orderId })
+        });
+        const paymentOrder = await res.json();
+
+        if (paymentOrder.error) {
+          throw new Error(paymentOrder.error);
+        }
+
+        if (paymentOrder.isMock) {
+          showToast('Razorpay keys not configured. Simulating successful checkout.', 'info');
+          const finalMockOrder = {
+            ...newOrder,
+            paymentDetails: {
+              method: 'ONLINE' as const,
+              status: 'SUCCESS' as const,
+              transactionId: `mock_txn_${Math.random().toString(36).substring(2, 9)}`,
+            }
+          };
+          await executeDatabaseWrites(finalMockOrder);
+          setLoading(false);
+          return;
+        }
+
+        const isScriptLoaded = await loadRazorpayScript();
+        if (!isScriptLoaded) {
+          showToast('Failed to load Razorpay SDK. Check your network connection.', 'error');
+          setLoading(false);
+          return;
+        }
+
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_your_key_id',
+          amount: paymentOrder.amount,
+          currency: paymentOrder.currency,
+          name: 'ESHwar Home Needs',
+          description: 'Smart Retail & Wholesale Checkout',
+          order_id: paymentOrder.id,
+          handler: async function (response: any) {
+            try {
+              const finalPaidOrder = {
+                ...newOrder,
+                paymentDetails: {
+                  method: 'ONLINE' as const,
+                  status: 'SUCCESS' as const,
+                  transactionId: response.razorpay_payment_id,
+                  gatewayOrderId: response.razorpay_order_id,
+                  gatewaySignature: response.razorpay_signature,
+                }
+              };
+              await executeDatabaseWrites(finalPaidOrder);
+            } catch (err) {
+              console.error('Post-payment save error:', err);
+              showToast('Payment successful, but order failed to save. Reference ID: ' + response.razorpay_payment_id, 'error');
+            } finally {
+              setLoading(false);
+            }
+          },
+          prefill: {
+            name: name,
+            email: email,
+            contact: phone,
+          },
+          theme: {
+            color: '#b87333', // ESHwar Copper theme accent color
+          },
+          modal: {
+            ondismiss: function () {
+              showToast('Payment window closed by customer.', 'info');
+              setLoading(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        // Cash on Delivery
+        await executeDatabaseWrites(newOrder);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to place order. Try again.', 'error');
+      setLoading(false);
+    }
+  };
+
+  // Trigger GST Invoice PDF download
+  const downloadInvoice = () => {
+    if (orderCreated) {
+      const pdf = generateInvoicePDF(orderCreated);
+      pdf.save(`ESHwar_Invoice_${orderCreated.id.slice(0, 8).toUpperCase()}.pdf`);
+      showToast('Invoice downloaded!', 'success');
+    }
+  };
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(val);
+  };
+
+  // SUCCESS SCREEN
+  if (orderCreated) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow max-w-lg mx-auto px-4 py-16 text-center space-y-6">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-xs">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold font-serif text-stone-900">Order Placed Successfully!</h2>
+            <p className="text-xs text-stone-500">
+              Thank you for shopping with ESHwar Home Needs. Your order ID is <strong>{orderCreated.id.slice(0, 8).toUpperCase()}</strong>.
+            </p>
+          </div>
+
+          <div className="bg-white border border-stone-200 rounded-2xl p-5 text-xs text-left space-y-2.5 shadow-sm">
+            <h3 className="font-bold text-stone-800 uppercase tracking-wider text-[10px] pb-1.5 border-b border-stone-100">
+              Receipt Summary
+            </h3>
+            <div className="flex justify-between">
+              <span>Billed To:</span>
+              <span className="font-semibold text-stone-700">{orderCreated.customerDetails.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Items Count:</span>
+              <span className="font-semibold text-stone-700">{orderCreated.items.length} products</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Payment Mode:</span>
+              <span className="font-semibold text-stone-700">{orderCreated.paymentDetails.method}</span>
+            </div>
+            <div className="flex justify-between border-t border-stone-100 pt-2 font-bold text-stone-900">
+              <span>Total Paid:</span>
+              <span>{formatCurrency(orderCreated.grandTotal)}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={downloadInvoice}
+              className="flex-1 bg-copper hover:bg-copper-dark text-white font-bold py-2.5 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <FileText className="w-4 h-4" /> Download GST Invoice
+            </button>
+            <Link
+              href="/shop"
+              className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold py-2.5 rounded-lg text-xs block text-center"
+            >
+              Back to Catalog
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Navbar />
+
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <h1 className="text-3xl font-extrabold text-stone-900 font-serif mb-6">Secure Checkout</h1>
+
+        {cart.items.length > 0 ? (
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            
+            {/* Checkout Form Inputs (3/5 width) */}
+            <div className="lg:col-span-3 space-y-6">
+              
+              {/* Customer Contact Panel */}
+              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider border-b border-stone-100 pb-2">
+                  1. Contact Details
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="text-[10px] font-semibold text-stone-500 block mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-stone-500 block mb-1">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-stone-500 block mb-1">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 9876543210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-stone-500 block mb-1">GSTIN (Optional for business claim)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 29AAAAE1234F1Z5"
+                      value={gstin}
+                      onChange={(e) => setGstin(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Address Panel */}
+              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider border-b border-stone-100 pb-2">
+                  2. Shipping Address
+                </h3>
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <label className="text-[10px] font-semibold text-stone-500 block mb-1">Street Address / House No. *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Apartment, Street name, Land mark"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[10px] font-semibold text-stone-500 block mb-1">City *</label>
+                      <input
+                        type="text"
+                        required
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-stone-500 block mb-1">State *</label>
+                      <input
+                        type="text"
+                        required
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-stone-500 block mb-1">Pincode *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="560001"
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 focus:outline-none focus:border-copper"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment selector Panel */}
+              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider border-b border-stone-100 pb-2">
+                  3. Payment Method
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold">
+                  
+                  {/* COD */}
+                  <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
+                    paymentMethod === 'COD' ? 'border-copper bg-copper/5 text-copper' : 'border-stone-200 hover:border-copper/40'
+                  }`}>
+                    <input 
+                      type="radio" 
+                      name="payment" 
+                      className="sr-only"
+                      checked={paymentMethod === 'COD'}
+                      onChange={() => setPaymentMethod('COD')}
+                    />
+                    <Truck className="w-5 h-5" />
+                    <span>Cash on Delivery</span>
+                  </label>
+
+                  {/* Online */}
+                  <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
+                    paymentMethod === 'ONLINE' ? 'border-copper bg-copper/5 text-copper' : 'border-stone-200 hover:border-copper/40'
+                  }`}>
+                    <input 
+                      type="radio" 
+                      name="payment" 
+                      className="sr-only"
+                      checked={paymentMethod === 'ONLINE'}
+                      onChange={() => setPaymentMethod('ONLINE')}
+                    />
+                    <CreditCard className="w-5 h-5" />
+                    <span>Razorpay / UPI</span>
+                  </label>
+
+                  {/* NEFT */}
+                  <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
+                    paymentMethod === 'NEFT_RTGS' ? 'border-copper bg-copper/5 text-copper' : 'border-stone-200 hover:border-copper/40'
+                  }`}>
+                    <input 
+                      type="radio" 
+                      name="payment" 
+                      className="sr-only"
+                      checked={paymentMethod === 'NEFT_RTGS'}
+                      onChange={() => setPaymentMethod('NEFT_RTGS')}
+                    />
+                    <Landmark className="w-5 h-5" />
+                    <span>NEFT / RTGS</span>
+                  </label>
+
+                </div>
+              </div>
+
+            </div>
+
+            {/* Side Order Review Panel (2/5 width) */}
+            <div className="lg:col-span-2">
+              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-4 sticky top-24">
+                <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider border-b border-stone-100 pb-2 font-serif">
+                  Order Review
+                </h3>
+
+                {/* Items preview list */}
+                <div className="max-h-60 overflow-y-auto divide-y divide-stone-100 pr-1">
+                  {cart.items.map((item) => (
+                    <div key={`${item.productId}-${item.variantId || ''}`} className="py-2.5 flex justify-between gap-3 text-xs">
+                      <div>
+                        <span className="font-semibold text-stone-800 block leading-tight">{item.name}</span>
+                        <span className="text-[10px] text-stone-400 mt-0.5 block">{item.quantity} {item.unit} × {formatCurrency(item.price)}</span>
+                      </div>
+                      <span className="font-bold text-stone-900 shrink-0">{formatCurrency(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-stone-100 pt-3 space-y-2 text-xs text-stone-600">
+                  <div className="flex justify-between">
+                    <span>Taxable Subtotal</span>
+                    <span>{formatCurrency(cart.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>GST (CGST + SGST)</span>
+                    <span>{formatCurrency(cart.gst)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Shipping Charges</span>
+                    <span>{cart.deliveryCharge === 0 ? 'FREE' : formatCurrency(cart.deliveryCharge)}</span>
+                  </div>
+                  
+                  <div className="border-t border-stone-100 pt-2 flex justify-between items-center text-sm font-bold text-stone-950">
+                    <span>Grand Total</span>
+                    <span>{formatCurrency(cart.grandTotal)}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-copper hover:bg-copper-dark text-white font-bold py-3 rounded-lg text-xs tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Processing Order...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Place Order &amp; Pay</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+          </form>
+        ) : (
+          <div className="text-center py-20 bg-stone-50 border border-stone-200 rounded-3xl max-w-md mx-auto">
+            <h2 className="text-lg font-bold text-stone-800 font-serif">Cart is Empty</h2>
+            <Link 
+              href="/shop"
+              className="mt-4 bg-copper text-white px-5 py-2 rounded-lg text-xs font-bold block w-max mx-auto"
+            >
+              Browse Catalog
+            </Link>
+          </div>
+        )}
+
+      </main>
+
+      <Footer />
+    </div>
+  );
+}

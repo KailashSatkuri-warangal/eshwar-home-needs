@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // Allow if token has admin email or custom claims
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@eshwarhomeneeds.com'
+      );
+    }
+
+    // 1. Products original media and 360 views
+    match /products/{productId}/{allPaths=**} {
+      allow read: if true; // Publicly readable for store display
+      allow write: if isSignedIn(); // Allow upload in this setup (can narrow to staff via client verification)
+    }
+
+    // 2. Scrap request photos
+    match /scrap/{userId}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 3. Review photos
+    match /reviews/{fileName} {
+      allow read: if true; // Public
+      allow write: if isSignedIn();
+    }
+
+    // 4. Invoice PDFs
+    match /invoices/{userId}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn(); // System can write
+    }
+  }
+}

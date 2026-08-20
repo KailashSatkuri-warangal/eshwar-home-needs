@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #fbf9f6; /* Soft warm white cream */
+  --foreground: #1c1917; /* Slate dark charcoal */
+  
+  --copper: #b87333;
+  --copper-light: #d69e6b;
+  --copper-dark: #8c5220;
+  
+  --brass: #d4af37;
+  --brass-light: #ffd700;
+  --brass-dark: #a67c1e;
+  
+  --earth: #2c1a11;
+  --cream: #fbf9f6;
+  --scrap: #0f766e; /* Recycling Green-Teal */
+}
+
+@theme {
+  --color-copper: var(--copper);
+  --color-copper-light: var(--copper-light);
+  --color-copper-dark: var(--copper-dark);
+  
+  --color-brass: var(--brass);
+  --color-brass-light: var(--brass-light);
+  --color-brass-dark: var(--brass-dark);
+  
+  --color-earth: var(--earth);
+  --color-cream: var(--cream);
+  --color-scrap: var(--scrap);
+  --color-scrap-light: #14b8a6;
+  --color-scrap-dark: #115e59;
+  
+  --font-sans: 'Outfit', sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7a47d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b87333;
+}
+
+/* Premium Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Custom Glassmorphism styles */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
