@@ -49,11 +49,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+  const isStaffOrAdmin = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+
   const menuItems = [
     { name: 'Dashboard Analytics', href: '/admin', icon: BarChart3 },
-    { name: 'Products CRUD', href: '/admin/products', icon: Box },
-    { name: 'Wholesale Quotes', href: '/admin/quotes', icon: FileText },
-    { name: 'Scrap requests', href: '/admin/scrap', icon: Scale },
+    ...(isStaffOrAdmin ? [
+      { name: 'Products CRUD', href: '/admin/products', icon: Box },
+    ] : []),
+    ...(isAdminUser ? [
+      { name: 'Wholesale Quotes', href: '/admin/quotes', icon: FileText },
+    ] : []),
+    { name: 'Scrap Requests', href: '/admin/scrap', icon: Scale },
   ];
 
   return (
@@ -68,7 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="text-lg font-bold text-white tracking-tight flex items-center gap-1 font-serif">
                 ESHwar
                 <span className="text-copper text-[10px] font-sans font-bold px-1.5 py-0.5 rounded-sm bg-copper/20 border border-copper/30">
-                  ADMIN
+                  {isAdminUser ? 'ADMIN' : 'STAFF'}
                 </span>
               </span>
               <span className="text-[8px] uppercase tracking-widest text-stone-400 font-bold mt-1">
@@ -76,7 +83,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </span>
             </Link>
           </div>
-
+ 
           {/* Nav Links */}
           <nav className="p-4 space-y-1 text-xs font-semibold">
             {menuItems.map((item) => {
@@ -99,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
           </nav>
         </div>
-
+ 
         {/* Footer Actions */}
         <div className="p-4 border-t border-stone-800 text-xs font-semibold space-y-2">
           <Link 
@@ -119,14 +126,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
       </aside>
-
+ 
       {/* Main Admin Content Panel */}
       <div className="flex-1 flex flex-col overflow-y-auto h-screen pb-16">
         
         {/* Header Toolbar */}
         <header className="bg-white border-b border-stone-200 h-14 flex items-center justify-between px-6 py-4">
           <span className="text-xs font-bold text-stone-500">
-            Welcome, {user.displayName} (Sales Administrator)
+            Welcome, {user.displayName} ({isAdminUser ? 'Administrator' : 'Staff Representative'})
           </span>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse" />

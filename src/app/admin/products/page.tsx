@@ -12,7 +12,22 @@ import {
 } from 'lucide-react';
 
 export default function AdminProductsPage() {
-  const { showToast } = useApp();
+  const { user, showToast } = useApp();
+
+  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+  const isStaffOrAdmin = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+
+  if (!isStaffOrAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-white border border-stone-200 rounded-2xl max-w-md mx-auto my-12">
+        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-3">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m3-13a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        </div>
+        <h3 className="font-bold text-stone-900 text-sm font-serif">Access Denied</h3>
+        <p className="text-xs text-stone-500 mt-1">You are not authorized to access Product Catalog Management.</p>
+      </div>
+    );
+  }
   
   // State lists
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
@@ -126,6 +141,13 @@ export default function AdminProductsPage() {
   // Submit product creation/update
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Programmatic guard: Only admin can add new products
+    if (!editingProduct && !isAdminUser) {
+      showToast('Permission denied. Only administrators can add new products.', 'error');
+      return;
+    }
+
     const id = editingProduct ? editingProduct.id : `prd_${Math.random().toString(36).substring(2, 9)}`;
 
     const updatedProduct: Product = {
@@ -184,6 +206,12 @@ export default function AdminProductsPage() {
 
   // Deletes product
   const deleteProduct = async (id: string) => {
+    // Programmatic guard: Only admin can delete products
+    if (!isAdminUser) {
+      showToast('Permission denied. Only administrators can delete products.', 'error');
+      return;
+    }
+
     if (confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDbDoc('products', id);
@@ -245,7 +273,7 @@ export default function AdminProductsPage() {
           <p className="text-xs text-stone-500 mt-0.5">Manage store products, specifications, and AI 360-degree assets</p>
         </div>
 
-        {!editingProduct && !isAddMode && (
+        {!editingProduct && !isAddMode && isAdminUser && (
           <button
             onClick={startAdd}
             className="bg-copper hover:bg-copper-dark text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -550,13 +578,15 @@ export default function AdminProductsPage() {
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => deleteProduct(product.id)}
-                            className="p-1.5 bg-stone-100 text-red-600 hover:bg-red-50 rounded cursor-pointer"
-                            title="Delete Product"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {isAdminUser && (
+                            <button
+                              onClick={() => deleteProduct(product.id)}
+                              className="p-1.5 bg-stone-100 text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                              title="Delete Product"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

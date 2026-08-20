@@ -11,7 +11,22 @@ import {
 } from 'lucide-react';
 
 export default function AdminQuotesPage() {
-  const { showToast } = useApp();
+  const { user, showToast } = useApp();
+  
+  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+
+  if (!isAdminUser) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-white border border-stone-200 rounded-2xl max-w-md mx-auto my-12">
+        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-3">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m3-13a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        </div>
+        <h3 className="font-bold text-stone-900 text-sm font-serif">Access Denied</h3>
+        <p className="text-xs text-stone-500 mt-1">Only Administrators are authorized to view or configure wholesale quotation rates.</p>
+      </div>
+    );
+  }
+
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(false);
 

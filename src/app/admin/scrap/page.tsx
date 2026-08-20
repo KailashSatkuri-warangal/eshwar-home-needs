@@ -18,7 +18,10 @@ const getMaterialLabel = (type: string) => {
 };
 
 export default function AdminScrapPage() {
-  const { showToast } = useApp();
+  const { user, showToast } = useApp();
+  
+  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+
   const [pickups, setPickups] = useState<ScrapRequest[]>([]);
   const [rates, setRates] = useState<ScrapRate[]>(MOCK_SCRAP_RATES);
   const [loading, setLoading] = useState(false);
@@ -216,53 +219,64 @@ export default function AdminScrapPage() {
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Copper Rate (₹)</label>
                 <input
                   type="number" required value={copperRate} onChange={(e) => setCopperRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Brass Rate (₹)</label>
                 <input
                   type="number" required value={brassRate} onChange={(e) => setBrassRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Stainless Steel Rate (₹)</label>
                 <input
                   type="number" required value={ssRate} onChange={(e) => setSsRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Iron/Steel Rate (₹)</label>
                 <input
                   type="number" required value={steelRate} onChange={(e) => setSteelRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Aluminium Rate (₹)</label>
                 <input
                   type="number" required value={aluminiumRate} onChange={(e) => setAluminiumRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-stone-500 block mb-1">Plastic Rate (₹)</label>
                 <input
                   type="number" required value={plasticRate} onChange={(e) => setPlasticRate(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold"
+                  disabled={!isAdminUser}
+                  className="w-full bg-stone-50 border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
             <div className="pt-2">
               <button
-                type="submit" disabled={loading}
-                className="w-full bg-copper hover:bg-copper-dark text-white font-bold py-2.5 rounded-lg text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                type="submit" disabled={loading || !isAdminUser}
+                className="w-full bg-copper hover:bg-copper-dark text-white font-bold py-2.5 rounded-lg text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" /> Save Buying Rates
               </button>
+              {!isAdminUser && (
+                <p className="text-[10px] text-rose-600 font-semibold mt-2 text-center bg-rose-50 border border-rose-100 rounded p-2">
+                  ⚠️ View-Only Mode: Only administrators can modify daily buying rates.
+                </p>
+              )}
             </div>
           </form>
         </div>
