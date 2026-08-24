@@ -384,6 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {showGlobalOtpModal && user && user.phone && (
         <OtpVerificationModal
           phone={user.phone}
+          email={user.email}
           userId={user.uid}
           userProfile={user}
           onSuccess={(updatedProfile) => {

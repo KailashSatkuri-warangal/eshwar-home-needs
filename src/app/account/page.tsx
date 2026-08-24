@@ -1125,6 +1125,7 @@ export default function AccountPage() {
       {showOtpModal && user && user.phone && (
         <OtpVerificationModal
           phone={user.phone}
+          email={user.email}
           userId={user.uid}
           userProfile={user}
           onSuccess={(updatedProfile) => {

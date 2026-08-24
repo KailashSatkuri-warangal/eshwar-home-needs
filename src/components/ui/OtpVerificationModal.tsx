@@ -1,13 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Lock, ShieldCheck, Smartphone, RotateCw } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
-import { setDbDoc } from '@/lib/services/db';
+import { X, Lock, ShieldCheck, Mail, RotateCw } from 'lucide-react';
 
 interface OtpVerificationModalProps {
   phone: string;
+  email: string;
   userId: string;
   userProfile: any;
   onSuccess: (updatedProfile: any) => void;
@@ -17,6 +15,7 @@ interface OtpVerificationModalProps {
 
 export default function OtpVerificationModal({
   phone,
+  email,
   userId,
   userProfile,
   onSuccess,
@@ -25,7 +24,6 @@ export default function OtpVerificationModal({
 }: OtpVerificationModalProps) {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
@@ -42,70 +40,26 @@ export default function OtpVerificationModal({
     };
   }, [timer]);
 
-  // Clean up recaptcha verifier when component unmounts
-  useEffect(() => {
-    return () => {
-      if ((window as any).recaptchaVerifier) {
-        try {
-          (window as any).recaptchaVerifier.clear();
-          (window as any).recaptchaVerifier = null;
-        } catch (e) {}
-      }
-    };
-  }, []);
-
   const handleSendOtp = async () => {
     setLoading(true);
     try {
-      // 1. Format the phone number to ensure +91 prefix for Indian numbers if not already present
-      let formattedPhone = phone.trim();
-      if (!formattedPhone.startsWith('+')) {
-        if (formattedPhone.startsWith('0')) {
-          formattedPhone = '+91' + formattedPhone.substring(1);
-        } else if (formattedPhone.length === 10) {
-          formattedPhone = '+91' + formattedPhone;
-        } else {
-          formattedPhone = '+' + formattedPhone;
-        }
-      }
-
-      // 2. Initialize and clear reCAPTCHA container DOM to prevent duplicate rendering errors
-      const container = document.getElementById('recaptcha-container');
-      if (!container) {
-        throw new Error('Recaptcha container element not found in DOM.');
-      }
-      container.innerHTML = ''; 
-      
-      // Clean up previous global instances
-      if ((window as any).recaptchaVerifier) {
-        try {
-          (window as any).recaptchaVerifier.clear();
-          (window as any).recaptchaVerifier = null;
-        } catch (e) {}
-      }
-
-      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => {
-          console.log('Recaptcha solved');
-        }
+      const response = await fetch('/api/email/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, email, phone }),
       });
-      (window as any).recaptchaVerifier = verifier;
 
-      // 3. Trigger Firebase Phone Auth SMS
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
-      setConfirmationResult(confirmation);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to dispatch verification code.');
+      }
+
       setOtpSent(true);
       setTimer(60); // 60 seconds resend timer
-      showToast(`🔑 Verification SMS sent to ${formattedPhone}! Please check your mobile.`, 'success');
+      showToast(`🔑 Verification OTP code sent to your email: ${email}!`, 'success');
     } catch (err) {
-      console.error('Error sending OTP:', err);
-      const errMsg = (err as Error).message;
-      if (errMsg.includes('auth/operation-not-allowed')) {
-        showToast('Phone provider settings blocked in GCP. Enable India (+91) region under SMS Region Policy inside Identity Platform settings!', 'error');
-      } else {
-        showToast('Failed to send SMS: ' + errMsg, 'error');
-      }
+      console.error('Error triggering OTP email:', err);
+      showToast((err as Error).message, 'error');
     } finally {
       setLoading(false);
     }
@@ -117,37 +71,25 @@ export default function OtpVerificationModal({
       showToast('Please enter the 6-digit OTP code.', 'error');
       return;
     }
-    if (!confirmationResult) {
-      showToast('No active verification session found. Please request a new OTP.', 'error');
-      return;
-    }
 
     setVerifying(true);
     try {
-      // Verify via actual Firebase Phone confirmation
-      await confirmationResult.confirm(otpCode);
+      const response = await fetch('/api/email/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, email, phone, code: otpCode, userProfile }),
+      });
 
-      const updatedProfile = {
-        ...userProfile,
-        phone,
-        phoneVerified: true,
-        updatedAt: new Date()
-      };
-      
-      await setDbDoc('users', userId, updatedProfile);
-      showToast('Mobile number verified successfully!', 'success');
-      
-      if ((window as any).recaptchaVerifier) {
-        try {
-          (window as any).recaptchaVerifier.clear();
-          (window as any).recaptchaVerifier = null;
-        } catch (e) {}
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification failed.');
       }
-      
-      onSuccess(updatedProfile);
+
+      showToast('Mobile number verified successfully!', 'success');
+      onSuccess(data.updatedProfile || { ...userProfile, phone, phoneVerified: true });
     } catch (err) {
-      console.error('OTP confirmation failed:', err);
-      showToast('Invalid OTP code. Please check your SMS and try again.', 'error');
+      console.error('OTP verification failed:', err);
+      showToast((err as Error).message, 'error');
     } finally {
       setVerifying(false);
     }
@@ -155,9 +97,6 @@ export default function OtpVerificationModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-55 flex items-center justify-center p-4">
-      {/* Invisible Recaptcha Container required by Firebase Phone Auth */}
-      <div id="recaptcha-container" className="invisible absolute"></div>
-
       <div className="bg-white border border-stone-200 rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200 relative">
         <button
           onClick={onClose}
@@ -167,7 +106,7 @@ export default function OtpVerificationModal({
         </button>
 
         <div className="w-12 h-12 bg-copper/10 text-copper rounded-full flex items-center justify-center mx-auto">
-          {otpSent ? <Lock className="w-5 h-5" /> : <Smartphone className="w-5 h-5" />}
+          {otpSent ? <Lock className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
         </div>
 
         <div className="space-y-1.5">
@@ -176,8 +115,8 @@ export default function OtpVerificationModal({
           </h3>
           <p className="text-xs text-stone-500 leading-relaxed">
             {otpSent 
-              ? `A 6-digit OTP code has been dispatched to ${phone}`
-              : `To verify your account, please verify your mobile number ${phone}`}
+              ? `A 6-digit OTP code has been sent to your email address: ${email}`
+              : `To verify your contact number ${phone}, we will send an OTP code to your registered email address ${email}`}
           </p>
         </div>
 
@@ -189,7 +128,7 @@ export default function OtpVerificationModal({
           >
             {loading ? (
               <>
-                <RotateCw className="w-3.5 h-3.5 animate-spin" /> Sending SMS...
+                <RotateCw className="w-3.5 h-3.5 animate-spin" /> Sending Email...
               </>
             ) : (
               'Send Verification OTP'

@@ -1018,6 +1018,7 @@ export default function CheckoutPage() {
       {showOtpModal && (
         <OtpVerificationModal
           phone={phone}
+          email={email || user?.email || ''}
           userId={user?.uid || 'guest_checkout'}
           userProfile={user}
           onSuccess={(updatedProfile) => {
