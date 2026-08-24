@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Lock, ShieldCheck, Smartphone, RotateCw } from 'lucide-react';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
 import { setDbDoc } from '@/lib/services/db';
 
 interface OtpVerificationModalProps {
@@ -23,8 +25,9 @@ export default function OtpVerificationModal({
 }: OtpVerificationModalProps) {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [verifying, setVerifying] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
@@ -39,28 +42,90 @@ export default function OtpVerificationModal({
     };
   }, [timer]);
 
-  const handleSendOtp = () => {
-    // Generate a random 6-digit OTP
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(code);
-    setOtpSent(true);
-    setTimer(45); // 45 seconds resend timer
-    
-    // Simulate SMS gateway output
-    showToast(`🔑 [SMS Gateway Simulator] OTP sent to ${phone}: ${code}`, 'success');
-    console.log(`[SMS Gateway Simulator] OTP Code: ${code}`);
+  // Clean up recaptcha verifier when component unmounts
+  useEffect(() => {
+    return () => {
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+          (window as any).recaptchaVerifier = null;
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  const handleSendOtp = async () => {
+    setLoading(true);
+    try {
+      // 1. Format the phone number to ensure +91 prefix for Indian numbers if not already present
+      let formattedPhone = phone.trim();
+      if (!formattedPhone.startsWith('+')) {
+        if (formattedPhone.startsWith('0')) {
+          formattedPhone = '+91' + formattedPhone.substring(1);
+        } else if (formattedPhone.length === 10) {
+          formattedPhone = '+91' + formattedPhone;
+        } else {
+          formattedPhone = '+' + formattedPhone;
+        }
+      }
+
+      // 2. Initialize RecaptchaVerifier
+      const container = document.getElementById('recaptcha-container');
+      if (!container) {
+        throw new Error('Recaptcha container element not found in DOM.');
+      }
+      
+      // Clean up previous instance if any
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+        } catch (e) {}
+      }
+
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {
+          console.log('Recaptcha solved');
+        }
+      });
+      (window as any).recaptchaVerifier = verifier;
+
+      // 3. Trigger Firebase Phone Auth SMS
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
+      setConfirmationResult(confirmation);
+      setOtpSent(true);
+      setTimer(60); // 60 seconds resend timer
+      showToast(`🔑 Verification SMS sent to ${formattedPhone}! Please check your mobile.`, 'success');
+    } catch (err) {
+      console.error('Error sending OTP:', err);
+      const errMsg = (err as Error).message;
+      if (errMsg.includes('auth/operation-not-allowed')) {
+        showToast('Phone sign-in is not enabled in your Firebase Console. Go to Authentication -> Sign-in Method and enable the Phone provider!', 'error');
+      } else {
+        showToast('Failed to send SMS: ' + errMsg, 'error');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode !== generatedOtp) {
-      showToast('Invalid OTP code. Please check and try again.', 'error');
+    if (!confirmationResult) {
+      showToast('No active verification session found. Please request a new OTP.', 'error');
+      return;
+    }
+    if (otpCode.length !== 6) {
+      showToast('Please enter the 6-digit OTP code.', 'error');
       return;
     }
 
     setVerifying(true);
     try {
-      // Save verified state to Firestore
+      // 1. Confirm the verification code via Firebase
+      await confirmationResult.confirm(otpCode);
+
+      // 2. Save verified state to Firestore
       const updatedProfile = {
         ...userProfile,
         phone,
@@ -70,10 +135,18 @@ export default function OtpVerificationModal({
       
       await setDbDoc('users', userId, updatedProfile);
       showToast('Mobile number verified successfully!', 'success');
+      
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+          (window as any).recaptchaVerifier = null;
+        } catch (e) {}
+      }
+      
       onSuccess(updatedProfile);
     } catch (err) {
-      console.error(err);
-      showToast('Verification failed to save. Please try again.', 'error');
+      console.error('OTP confirmation failed:', err);
+      showToast('Invalid OTP code. Please check and try again.', 'error');
     } finally {
       setVerifying(false);
     }
@@ -81,6 +154,9 @@ export default function OtpVerificationModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-55 flex items-center justify-center p-4">
+      {/* Invisible Recaptcha Container required by Firebase Phone Auth */}
+      <div id="recaptcha-container" className="invisible absolute"></div>
+
       <div className="bg-white border border-stone-200 rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200 relative">
         <button
           onClick={onClose}
@@ -99,17 +175,24 @@ export default function OtpVerificationModal({
           </h3>
           <p className="text-xs text-stone-500 leading-relaxed">
             {otpSent 
-              ? `We simulated sending a 6-digit OTP code to ${phone}`
-              : `To secure your checkout, please verify your mobile number ${phone}`}
+              ? `A 6-digit OTP code has been dispatched to ${phone}`
+              : `To verify your account, please verify your mobile number ${phone}`}
           </p>
         </div>
 
         {!otpSent ? (
           <button
             onClick={handleSendOtp}
-            className="w-full bg-copper hover:bg-copper-dark text-white font-bold py-2.5 rounded-lg text-xs cursor-pointer shadow-xs transition-colors"
+            disabled={loading}
+            className="w-full bg-copper hover:bg-copper-dark text-white font-bold py-2.5 rounded-lg text-xs cursor-pointer shadow-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
-            Send Verification OTP
+            {loading ? (
+              <>
+                <RotateCw className="w-3.5 h-3.5 animate-spin" /> Sending SMS...
+              </>
+            ) : (
+              'Send Verification OTP'
+            )}
           </button>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
@@ -130,7 +213,7 @@ export default function OtpVerificationModal({
             >
               {verifying ? (
                 <>
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" /> Checking...
+                  <RotateCw className="w-3.5 h-3.5 animate-spin" /> Verifying...
                 </>
               ) : (
                 <>
@@ -146,9 +229,10 @@ export default function OtpVerificationModal({
                 <button
                   type="button"
                   onClick={handleSendOtp}
-                  className="text-[10px] font-bold text-copper hover:underline cursor-pointer"
+                  disabled={loading}
+                  className="text-[10px] font-bold text-copper hover:underline cursor-pointer disabled:opacity-50"
                 >
-                  Resend Verification OTP
+                  {loading ? 'Resending...' : 'Resend Verification OTP'}
                 </button>
               )}
             </div>
