@@ -7,7 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { Order, OrderItem, Address } from '@/types';
 import { setDbDoc } from '@/lib/services/db';
 import { generateInvoicePDF } from '@/lib/services/invoice';
-import { CheckCircle2, CreditCard, Truck, Landmark, RotateCw, FileText, Sparkles } from 'lucide-react';
+import { CheckCircle2, CreditCard, Truck, Landmark, RotateCw, FileText, Sparkles, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CheckoutPage() {
@@ -18,6 +18,7 @@ export default function CheckoutPage() {
   // Simulation states
   const [showMockPaymentModal, setShowMockPaymentModal] = useState(false);
   const [pendingMockOrder, setPendingMockOrder] = useState<Order | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Form Fields
   const [name, setName] = useState(user?.displayName || '');
@@ -98,8 +99,18 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (cart.items.length === 0) return;
 
+    setCheckoutError(null);
+
     if (!street || !pincode || !phone) {
       showToast('Please fill all required delivery details.', 'error');
+      return;
+    }
+
+    // Validate phone number format (10-digit Indian numbers)
+    const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      showToast('Invalid Phone Number. Please enter a valid 10-digit mobile number.', 'error');
+      setCheckoutError('Invalid Phone Number: Please enter a valid 10-digit mobile number (e.g. 9876543210).');
       return;
     }
 
@@ -195,20 +206,38 @@ export default function CheckoutPage() {
           order_id: paymentOrder.id,
           handler: async function (response: any) {
             try {
+              setLoading(true);
+              setCheckoutError(null);
+              
+              // Validate payment checksum signature on server
+              const verifyRes = await fetch('/api/payment/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                })
+              });
+              const verifyResult = await verifyRes.json();
+
+              if (!verifyResult.verified) {
+                throw new Error(verifyResult.error || 'Payment verification failed (checksum signature mismatch).');
+              }
+
               const finalPaidOrder = {
                 ...newOrder,
                 paymentDetails: {
                   method: 'ONLINE' as const,
                   status: 'SUCCESS' as const,
                   transactionId: response.razorpay_payment_id,
-                  gatewayOrderId: response.razorpay_order_id,
-                  gatewaySignature: response.razorpay_signature,
                 }
               };
               await executeDatabaseWrites(finalPaidOrder);
             } catch (err) {
-              console.error('Post-payment save error:', err);
-              showToast('Payment successful, but order failed to save. Reference ID: ' + response.razorpay_payment_id, 'error');
+              console.error('Payment verification/save error:', err);
+              setCheckoutError((err as Error).message || 'Payment checksum signature mismatch. Please attempt repayment.');
+              showToast('Verification failed. Please try repaying.', 'error');
             } finally {
               setLoading(false);
             }
@@ -238,7 +267,8 @@ export default function CheckoutPage() {
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to place order. Try again.', 'error');
+      setCheckoutError((err as Error).message || 'Failed to place order. Please try again.');
+      showToast('Checkout failed.', 'error');
       setLoading(false);
     }
   };
@@ -324,6 +354,13 @@ export default function CheckoutPage() {
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <h1 className="text-3xl font-extrabold text-stone-900 font-serif mb-6">Secure Checkout</h1>
+
+        {checkoutError && (
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-2xl mb-6 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{checkoutError}</span>
+          </div>
+        )}
 
         {cart.items.length > 0 ? (
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -629,6 +666,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setCheckoutError('Simulated Online Payment Failure: Card declined or transaction aborted.');
                   showToast('Payment simulation failed.', 'error');
                   setShowMockPaymentModal(false);
                 }}

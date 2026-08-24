@@ -5,7 +5,7 @@ import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
 import { useApp } from '@/context/AppContext';
 import { Order, Quote, ScrapRequest, CustomerType, Product } from '@/types';
-import { getDbDocsFiltered, setDbDoc } from '@/lib/services/db';
+import { getDbDocsFiltered, setDbDoc, subscribeDbDocsFiltered } from '@/lib/services/db';
 import { generateInvoicePDF, generateQuotationPDF } from '@/lib/services/invoice';
 import { 
   User, Package, FileText, Scale, Heart, LogOut, Key, 
@@ -41,45 +41,47 @@ export default function AccountPage() {
   const [utrInput, setUtrInput] = useState<Record<string, string>>({});
   const [submittingUtrMap, setSubmittingUtrMap] = useState<Record<string, boolean>>({});
 
-  // Fetch histories when user changes
+  // Fetch histories in real-time when user changes
   useEffect(() => {
-    if (user) {
-      setLoadingHistory(true);
-      
-      const fetchHistory = async () => {
-        if (user.uid === 'admin_demo_account') {
-          // Dev bypass: use empty arrays to avoid Firestore read violations on local anonymous state
-          setOrders([]);
-          setQuotes([]);
-          setScraps([]);
-          setLoadingHistory(false);
-          return;
-        }
-
-        try {
-          // 1. Fetch Orders
-          const ordersList = await getDbDocsFiltered('orders', 'userId', user.uid) as Order[];
-          ordersList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-          setOrders(ordersList);
-
-          // 2. Fetch Quotations
-          const quotesList = await getDbDocsFiltered('quotes', 'userId', user.uid) as Quote[];
-          quotesList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-          setQuotes(quotesList);
-
-          // 3. Fetch ScrapRequests
-          const scrapsList = await getDbDocsFiltered('scrapRequests', 'userId', user.uid) as ScrapRequest[];
-          scrapsList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-          setScraps(scrapsList);
-        } catch (e) {
-          console.error('Error loading history maps:', e);
-        } finally {
-          setLoadingHistory(false);
-        }
-      };
-
-      fetchHistory();
+    if (!user) return;
+    
+    if (user.uid === 'admin_demo_account') {
+      setOrders([]);
+      setQuotes([]);
+      setScraps([]);
+      setLoadingHistory(false);
+      return;
     }
+
+    setLoadingHistory(true);
+
+    // 1. Subscribe to Orders in real-time
+    const unsubscribeOrders = subscribeDbDocsFiltered('orders', 'userId', user.uid, (data) => {
+      const sorted = [...data] as Order[];
+      sorted.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setOrders(sorted);
+      setLoadingHistory(false);
+    });
+
+    // 2. Subscribe to Quotes in real-time
+    const unsubscribeQuotes = subscribeDbDocsFiltered('quotes', 'userId', user.uid, (data) => {
+      const sorted = [...data] as Quote[];
+      sorted.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setQuotes(sorted);
+    });
+
+    // 3. Subscribe to Scrap Requests in real-time
+    const unsubscribeScrap = subscribeDbDocsFiltered('scrapRequests', 'userId', user.uid, (data) => {
+      const sorted = [...data] as ScrapRequest[];
+      sorted.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setScraps(sorted);
+    });
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeQuotes();
+      unsubscribeScrap();
+    };
   }, [user]);
 
   // Auth Submits
@@ -194,6 +196,24 @@ export default function AccountPage() {
         order_id: paymentOrder.id,
         handler: async function (response: any) {
           try {
+            setLoadingHistory(true);
+
+            // Verify checksum signature on server
+            const verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+            });
+            const verifyResult = await verifyRes.json();
+
+            if (!verifyResult.verified) {
+              throw new Error(verifyResult.error || 'Payment verification failed (checksum signature mismatch).');
+            }
+
             const updatedOrder: Order = {
               ...order,
               paymentDetails: {
@@ -206,8 +226,8 @@ export default function AccountPage() {
             setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
             showToast('Payment successful! Order updated.', 'success');
           } catch (err) {
-            console.error('Error saving payment reference:', err);
-            showToast('Payment succeeded, but failed to update order record.', 'error');
+            console.error('Error verifying payment reference:', err);
+            showToast('Verification failed: ' + ((err as Error).message || 'Checksum mismatch.'), 'error');
           } finally {
             setLoadingHistory(false);
           }

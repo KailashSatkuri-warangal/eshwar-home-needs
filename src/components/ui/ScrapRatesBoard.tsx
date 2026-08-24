@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrapRate, ScrapMaterialType } from '@/types';
 import { Scale, TrendingUp, TrendingDown, ArrowRight, RefreshCw } from 'lucide-react';
+import { subscribeDbCollection } from '@/lib/services/db';
 
 interface ScrapRatesBoardProps {
   initialRates: ScrapRate[];
@@ -12,6 +13,53 @@ export default function ScrapRatesBoard({ initialRates }: ScrapRatesBoardProps) 
   const [rates, setRates] = useState<ScrapRate[]>(initialRates);
   const [selectedMaterial, setSelectedMaterial] = useState<ScrapMaterialType>('copper');
   const [weight, setWeight] = useState<number>(10);
+
+  // Real-time rates subscription & commodity ticker simulation
+  useEffect(() => {
+    // 1. Subscribe to database rates
+    const unsubscribe = subscribeDbCollection('scrapRates', (dbRates) => {
+      if (dbRates && dbRates.length > 0) {
+        // Map to ScrapRate type to satisfy TypeScript
+        const mapped = dbRates.map(item => ({
+          id: (item.id || item.material) as ScrapMaterialType,
+          material: (item.material || item.id) as ScrapMaterialType,
+          currentRate: item.currentRate || 0,
+          previousRate: item.previousRate || item.currentRate || 0,
+          updatedAt: item.updatedAt || { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 }
+        }));
+        setRates(mapped);
+      }
+    });
+
+    // 2. Simulate live commodity pricing ticks
+    const interval = window.setInterval(() => {
+      setRates((prevRates) =>
+        prevRates.map((rate) => {
+          // 40% chance to fluctuate each rate on each tick
+          if (Math.random() > 0.4) return rate;
+          
+          const changePercent = (Math.random() * 0.8 - 0.4); // fluctuate between -0.4% and +0.4%
+          const delta = Math.round(rate.currentRate * (changePercent / 100) * 10) / 10;
+          
+          if (Math.abs(delta) < 0.1) return rate;
+
+          const newRate = Math.max(10, Math.round((rate.currentRate + delta) * 10) / 10);
+          
+          return {
+            ...rate,
+            previousRate: rate.currentRate,
+            currentRate: newRate,
+            updatedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+          };
+        })
+      );
+    }, 5000); // Ticks every 5 seconds
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // Helper to format material names
   const getMaterialLabel = (type: string) => {

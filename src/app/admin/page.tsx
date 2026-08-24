@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getDbDocs, setDbDoc } from '@/lib/services/db';
+import { getDbDocs, setDbDoc, subscribeDbCollection } from '@/lib/services/db';
 import { Order, Quote, ScrapRequest, Product } from '@/types';
 import { 
   MOCK_CATEGORIES, MOCK_PRODUCTS, MOCK_SCRAP_RATES, MOCK_REVIEWS 
@@ -32,71 +32,78 @@ export default function AdminDashboardPage() {
     customersCount: 0,
   });
 
-  const fetchDashboardData = async () => {
+  // 1. Subscribe to all collections in real-time
+  useEffect(() => {
     setLoadingDb(true);
-    try {
-      const allOrders = await getDbDocs('orders') as Order[];
-      const allQuotes = await getDbDocs('quotes') as Quote[];
-      const allScraps = await getDbDocs('scrapRequests') as ScrapRequest[];
-      const allUsers = await getDbDocs('users') as any[];
-      const allProducts = await getDbDocs('products') as Product[];
 
+    const unsubOrders = subscribeDbCollection('orders', (allOrders: Order[]) => {
       setOrders(allOrders);
+      setLoadingDb(false);
+    });
+
+    const unsubQuotes = subscribeDbCollection('quotes', (allQuotes: Quote[]) => {
       setQuotes(allQuotes);
+    });
+
+    const unsubScraps = subscribeDbCollection('scrapRequests', (allScraps: ScrapRequest[]) => {
       setScrapRequests(allScraps);
-      
+    });
+
+    const unsubUsers = subscribeDbCollection('users', (allUsers: any[]) => {
       const customerList = allUsers.filter(u => u.role === 'customer') || [];
       setCustomersCount(customerList.length || allUsers.length || 0);
+    });
 
-      // Calculations
-      // 1. Today's Sales (orders placed today)
-      const startOfDay = new Date();
-      startOfDay.setHours(0,0,0,0);
-      const todaySalesVal = allOrders
-        .filter(o => {
-          const date = o.createdAt?.seconds 
-            ? new Date(o.createdAt.seconds * 1000) 
-            : new Date(o.createdAt as string);
-          return date >= startOfDay;
-        })
-        .reduce((sum, o) => sum + (o.grandTotal || 0), 0);
-
-      // 2. Pending Quotes
-      const pendingQ = allQuotes.filter(q => q.status === 'REQUESTED').length;
-
-      // 3. Scrap Requests
-      const pendingS = allScraps.filter(s => s.status === 'REQUESTED' || s.status === 'SCHEDULED').length;
-
-      // 4. Scrap Payouts (completed payments)
-      const payoutsVal = allScraps
-        .filter(s => s.status === 'PAYMENT_COMPLETED')
-        .reduce((sum, s) => sum + (s.finalAmount || 0), 0);
-
-      // 5. Low Stock Count
+    const unsubProducts = subscribeDbCollection('products', (allProducts: Product[]) => {
       const lowStockVal = allProducts.filter(p => p.stockQuantity <= (p.lowStockThreshold || 5)).length;
       setLowStockCount(lowStockVal);
+    });
 
-      setStats({
-        todaySales: todaySalesVal,
-        ordersCount: allOrders.length,
-        wholesaleEnquiries: allQuotes.length,
-        pendingQuotes: pendingQ,
-        scrapRequests: pendingS,
-        scrapPayouts: payoutsVal,
-        lowStockCount: lowStockVal,
-        customersCount: customerList.length || allUsers.length || 0,
-      });
-
-    } catch (e) {
-      console.error('Error loading dashboard stats:', e);
-    } finally {
-      setLoadingDb(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
+    return () => {
+      unsubOrders();
+      unsubQuotes();
+      unsubScraps();
+      unsubUsers();
+      unsubProducts();
+    };
   }, []);
+
+  // 2. Reactively compute aggregate metrics
+  useEffect(() => {
+    // Today's Sales
+    const startOfDay = new Date();
+    startOfDay.setHours(0,0,0,0);
+    const todaySalesVal = orders
+      .filter(o => {
+        const date = o.createdAt?.seconds 
+          ? new Date(o.createdAt.seconds * 1000) 
+          : new Date(o.createdAt as string);
+        return date >= startOfDay;
+      })
+      .reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+
+    // Pending Quotes
+    const pendingQ = quotes.filter(q => q.status === 'REQUESTED').length;
+
+    // Scrap Requests
+    const pendingS = scrapRequests.filter(s => s.status === 'REQUESTED' || s.status === 'SCHEDULED').length;
+
+    // Scrap Payouts
+    const payoutsVal = scrapRequests
+      .filter(s => s.status === 'PAYMENT_COMPLETED')
+      .reduce((sum, s) => sum + (s.finalAmount || 0), 0);
+
+    setStats({
+      todaySales: todaySalesVal,
+      ordersCount: orders.length,
+      wholesaleEnquiries: quotes.length,
+      pendingQuotes: pendingQ,
+      scrapRequests: pendingS,
+      scrapPayouts: payoutsVal,
+      lowStockCount: lowStockCount,
+      customersCount: customersCount,
+    });
+  }, [orders, quotes, scrapRequests, customersCount, lowStockCount]);
 
   const handleSeedDatabase = async () => {
     if (seeding) return;
@@ -135,7 +142,6 @@ export default function AdminDashboardPage() {
 
       // Seeding completed successfully
       alert('Database successfully seeded with ESHwar Home Needs starter data!');
-      fetchDashboardData();
     } catch (err) {
       console.error(err);
       alert('Seeding failed: ' + (err as Error).message);
@@ -191,14 +197,10 @@ export default function AdminDashboardPage() {
           <p className="text-xs text-stone-500 mt-0.5">Real-time statistics of retail orders, wholesale requests, and scrap buying volumes</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={fetchDashboardData}
-            disabled={loadingDb}
-            className="p-2 bg-stone-100 text-stone-700 hover:bg-stone-200 rounded-full cursor-pointer disabled:opacity-50"
-            title="Refresh statistics"
-          >
-            <RefreshCw className={`w-4 h-4 ${loadingDb ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 px-3 py-1.5 rounded-full text-[10px] font-bold">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span>Live Sync Active</span>
+          </div>
           <button
             onClick={handleSeedDatabase}
             disabled={seeding}
