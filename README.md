@@ -152,6 +152,8 @@ npm run build
 
 ## 13. Mobile OTP Verification Gate (Fraud Prevention)
 * **Checkout Order Placement Gate:** Gated order placements behind a mobile number OTP check. Users (whether guests or registered) are blocked from clicking **"Place Order & Pay"** until their 10-digit Indian mobile number is verified.
-* **Smart OTP Simulator Modal:** Included a verification overlay popup (`src/components/ui/OtpVerificationModal.tsx`). Clicking **"Verify Mobile via OTP"** generates a random 6-digit verification code, prints the code in a simulated SMS toast, and requests verification entry.
+* **Cart Adding Gating Hook:** Gated the **"Add to Cart"** action globally. Clicking "Add to Cart" on any catalog item or recommendation banner automatically interrupts the flow if the logged-in customer's phone number is unverified.
+* **Auto-Queue Resume Action:** When the global OTP modal is triggered during a cart addition, it caches the product selection. The moment the user completes verification, the modal closes, updates their profile in memory, and automatically registers/adds the cached product to their cart.
+* **Smart OTP Simulator Modal:** Included a verification overlay popup (`src/components/ui/OtpVerificationModal.tsx`). Clicking "Verify Mobile via OTP" generates a random 6-digit verification code, prints the code in a simulated SMS toast, and requests verification entry.
 * **Verify Later Profile Integration:** Added a verification status indicator inside the My Account profile view (`src/app/account/page.tsx`). Unverified users can click **"Verify Now"** to complete verification at any time. Verified status is saved persistently in their Firestore profile document.
 * **Admin Verification Bypass:** The master admin email **`satkurikailash@gmail.com`** automatically registers with `phoneVerified: true` by default to bypass redundant code prompts.

@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../lib/firebase/config';
 import { getDbDocs, setDbDoc } from '@/lib/services/db';
+import OtpVerificationModal from '@/components/ui/OtpVerificationModal';
 
 interface Toast {
   id: string;
@@ -58,6 +59,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isWholesaleMode, setIsWholesaleMode] = useState(false);
 
+  // Global OTP and pending cart action states
+  const [showGlobalOtpModal, setShowGlobalOtpModal] = useState(false);
+  const [pendingCartAction, setPendingCartAction] = useState<(() => void) | null>(null);
+
   // Initialize Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -69,19 +74,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const profile = allUsers.find(u => u.uid === firebaseUser.uid);
           
           if (profile) {
-            const finalRole = (profile.email === 'admin@eshwarhomeneeds.com' || profile.email === 'admin1@eshwarhomeneeds.com') ? 'admin' : profile.role;
-            setUser({ ...profile, role: finalRole as any });
+            const isMasterAdmin = profile.email === 'admin@eshwarhomeneeds.com' || 
+                                  profile.email === 'admin1@eshwarhomeneeds.com' || 
+                                  profile.email === 'satkurikailash@gmail.com';
+            const finalRole = isMasterAdmin ? 'admin' : profile.role;
+            const finalPhoneVerified = isMasterAdmin ? true : (profile.phoneVerified || false);
+
+            setUser({ 
+              ...profile, 
+              role: finalRole as any,
+              phoneVerified: finalPhoneVerified
+            });
             // If customer has a wholesale role, automatically activate wholesale mode
             if (finalRole === 'wholesale') {
               setIsWholesaleMode(true);
             }
           } else {
             // If no doc exists (fallback), create one
+            const isMasterAdmin = firebaseUser.email === 'admin@eshwarhomeneeds.com' || 
+                                  firebaseUser.email === 'admin1@eshwarhomeneeds.com' || 
+                                  firebaseUser.email === 'satkurikailash@gmail.com';
+
             const newProfile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               displayName: firebaseUser.displayName || 'User',
-              role: (firebaseUser.email === 'admin@eshwarhomeneeds.com' || firebaseUser.email === 'admin1@eshwarhomeneeds.com') ? 'admin' : 'customer',
+              role: isMasterAdmin ? 'admin' : 'customer',
+              phoneVerified: isMasterAdmin,
               createdAt: new Date(),
               updatedAt: new Date(),
             };
@@ -128,29 +147,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [wishlist]);
 
   const login = async (email: string, pass: string) => {
-    try {
-      // 1. Try logging in to your live Firebase project first
-      await signInWithEmailAndPassword(auth, email, pass);
-      showToast('Logged in successfully!', 'success');
-    } catch (firebaseError) {
-      // 2. If live login fails (e.g., account not created yet), check if it matches the bypass credentials
-      if ((email === 'admin@eshwarhomeneeds.com' || email === 'admin1@eshwarhomeneeds.com' || email === 'satkurikailash@gmail.com') && pass === 'admin123') {
-        const adminProfile: UserProfile = {
-          uid: 'admin_demo_account',
-          email: email,
-          displayName: 'Satkuri Kailash (Admin Bypass)',
-          role: 'admin',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        setUser(adminProfile);
-        setUserLoading(false);
-        showToast('Logged in via Admin local bypass!', 'info');
-      } else {
-        // Otherwise, throw the original Firebase Auth error
-        throw firebaseError;
-      }
-    }
+    await signInWithEmailAndPassword(auth, email, pass);
+    showToast('Logged in successfully!', 'success');
   };
 
   const logout = async () => {
@@ -196,6 +194,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Cart Operations
   const addToCart = (product: Product, quantity: number, variant?: ProductVariant) => {
+    // Enforce phone verification gate for Cart Adding
+    if (!user) {
+      showToast('Please sign in or register to verify your mobile number and add items to your cart.', 'info');
+      return;
+    }
+
+    if (!user.phoneVerified) {
+      if (user.phone) {
+        showToast('Mobile verification required to add items to cart.', 'info');
+        setPendingCartAction(() => () => {
+          addToCart(product, quantity, variant);
+        });
+        setShowGlobalOtpModal(true);
+      } else {
+        showToast('Please add your mobile number in your Profile & Addresses tab to verify first.', 'error');
+      }
+      return;
+    }
+
     setCartItems((prev) => {
       const variantId = variant?.id;
       const existingIndex = prev.findIndex(
@@ -362,6 +379,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+
+      {/* Global OTP Verification Modal for Cart Addition Gating */}
+      {showGlobalOtpModal && user && user.phone && (
+        <OtpVerificationModal
+          phone={user.phone}
+          userId={user.uid}
+          userProfile={user}
+          onSuccess={(updatedProfile) => {
+            updateUserProfile(updatedProfile);
+            setShowGlobalOtpModal(false);
+            if (pendingCartAction) {
+              pendingCartAction();
+              setPendingCartAction(null);
+            }
+          }}
+          onClose={() => {
+            setShowGlobalOtpModal(false);
+            setPendingCartAction(null);
+          }}
+          showToast={showToast}
+        />
+      )}
       
       {/* Dynamic Toast Renderer */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">

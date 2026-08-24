@@ -41,13 +41,16 @@ export async function GET(request: Request) {
       }
     }
 
+    let tempPassCreated = '';
+
     // 2. If Kailash is not present in Auth, register him
     if (!isKailashCreated) {
+      tempPassCreated = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
       const newAuthUser = await adminAuth.createUser({
         email: 'satkurikailash@gmail.com',
         emailVerified: true,
         phoneNumber: '+918309740722',
-        password: 'admin123', // Initial temporary login password
+        password: tempPassCreated,
         displayName: 'Satkuri Kailash',
         disabled: false,
       });
@@ -92,6 +95,7 @@ export async function GET(request: Request) {
         deletedFirestoreProfiles: deletedFirestoreCount,
         primaryAdminEmail: 'satkurikailash@gmail.com',
         primaryAdminUid: kailashUid,
+        ...(tempPassCreated ? { temporaryPassword: tempPassCreated } : {}),
       }
     });
 

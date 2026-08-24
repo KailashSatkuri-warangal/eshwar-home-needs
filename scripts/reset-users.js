@@ -102,11 +102,12 @@ async function resetUsers() {
 
     // 3. Create satkurikailash@gmail.com in Firebase Auth
     console.log('\n⏳ Provisioning admin user: satkurikailash@gmail.com...');
+    const tempPassCreated = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
     const newAuthUser = await auth.createUser({
       email: 'satkurikailash@gmail.com',
       emailVerified: true,
       phoneNumber: '+918309740722',
-      password: 'admin123', // Initial master password
+      password: tempPassCreated,
       displayName: 'Satkuri Kailash',
       disabled: false,
     });
@@ -129,7 +130,7 @@ async function resetUsers() {
     console.log('\n====================================================');
     console.log('🎉 Cleanse completed successfully! Login using:');
     console.log('   Email:    satkurikailash@gmail.com');
-    console.log('   Password: admin123');
+    console.log(`   Password: ${tempPassCreated}`);
     console.log('====================================================');
   } catch (error) {
     console.error('❌ Cleanse process failed:');
