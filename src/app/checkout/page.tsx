@@ -4,14 +4,15 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
 import { useApp } from '@/context/AppContext';
-import { Order, OrderItem, Address } from '@/types';
-import { setDbDoc } from '@/lib/services/db';
+import { Order, OrderItem, Address, Product } from '@/types';
+import { setDbDoc, getDbDocs, getDbDocsFiltered } from '@/lib/services/db';
 import { generateInvoicePDF } from '@/lib/services/invoice';
-import { CheckCircle2, CreditCard, Truck, Landmark, RotateCw, FileText, Sparkles, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, CreditCard, Truck, Landmark, RotateCw, FileText, Sparkles, AlertTriangle, Smartphone } from 'lucide-react';
 import Link from 'next/link';
+import OtpVerificationModal from '@/components/ui/OtpVerificationModal';
 
 export default function CheckoutPage() {
-  const { cart, user, clearCart, showToast } = useApp();
+  const { cart, user, clearCart, showToast, addToCart, updateUserProfile } = useApp();
   const [loading, setLoading] = useState(false);
   const [orderCreated, setOrderCreated] = useState<Order | null>(null);
 
@@ -20,6 +21,8 @@ export default function CheckoutPage() {
   const [pendingMockOrder, setPendingMockOrder] = useState<Order | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [isGuestPhoneVerified, setIsGuestPhoneVerified] = useState(false);
 
   // Form Fields
   const [name, setName] = useState(user?.displayName || '');
@@ -51,6 +54,53 @@ export default function CheckoutPage() {
       }
     }
   }, [user]);
+
+  // Load customer's past purchases
+  const [previousOrders, setPreviousOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (user && user.uid !== 'admin_demo_account') {
+      getDbDocsFiltered('orders', 'userId', user.uid).then((res) => {
+        const successes = (res || []).filter(o => o.paymentDetails?.status === 'SUCCESS');
+        setPreviousOrders(successes as Order[]);
+      });
+    }
+  }, [user]);
+
+  // Product Recommendation Engine (category mapping)
+  const [recommendedProduct, setRecommendedProduct] = useState<Product | null>(null);
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      try {
+        const allProducts = await getDbDocs('products') as Product[];
+        if (!allProducts || allProducts.length === 0) return;
+
+        // Get category of items currently in the cart by looking up in the product list
+        const cartProductIds = cart.items.map(item => item.productId);
+        const cartCategories = allProducts
+          .filter(p => cartProductIds.includes(p.id))
+          .map(p => p.categoryId);
+
+        // Find products in catalog not in the cart
+        const candidates = allProducts.filter(p => 
+          !cart.items.some(c => c.productId === p.id) && p.stockQuantity > 0
+        );
+
+        if (candidates.length === 0) return;
+
+        // Try to match category, otherwise fall back to first candidate
+        const categoryMatch = candidates.find(p => cartCategories.includes(p.categoryId));
+        setRecommendedProduct(categoryMatch || candidates[0]);
+      } catch (e) {
+        console.error('Error loading recommendations:', e);
+      }
+    };
+
+    if (cart.items.length > 0) {
+      loadRecommendations();
+    }
+  }, [cart.items]);
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -96,6 +146,16 @@ export default function CheckoutPage() {
     showToast('Order placed successfully!', 'success');
   };
 
+  const triggerOtpVerification = () => {
+    if (!phone || !phone.match(/^(?:\+91|0)?[6-9]\d{9}$/)) {
+      showToast('Please type a valid 10-digit Indian mobile number first in the contact details form.', 'error');
+      setCheckoutError('Please enter a valid mobile number in Step 1 to send verification OTP.');
+      return;
+    }
+    setCheckoutError(null);
+    setShowOtpModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.items.length === 0) return;
@@ -112,6 +172,14 @@ export default function CheckoutPage() {
     if (!phoneRegex.test(phone.trim())) {
       showToast('Invalid Phone Number. Please enter a valid 10-digit mobile number.', 'error');
       setCheckoutError('Invalid Phone Number: Please enter a valid 10-digit mobile number (e.g. 9876543210).');
+      return;
+    }
+
+    const isUserVerified = user && user.phoneVerified;
+    const isPhoneVerified = isUserVerified || isGuestPhoneVerified;
+    if (!isPhoneVerified) {
+      showToast('Mobile number verification is required before placing the order.', 'error');
+      setCheckoutError('Mobile verification required: Please click the "Verify Mobile Number via OTP" button below to verify your number.');
       return;
     }
 
@@ -460,6 +528,42 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
+                  {/* Previous Purchases history & Recommendation inside Email */}
+                  {(previousOrders.length > 0 || recommendedProduct) && (
+                    <div className="border-t pt-4 space-y-3">
+                      {previousOrders.length > 0 && (
+                        <div className="space-y-1.5">
+                          <h4 className="font-bold text-stone-850 uppercase text-[9px]">Your Past Purchases with Us</h4>
+                          <div className="bg-stone-50 rounded-xl p-2.5 divide-y divide-stone-100 text-[10px] text-stone-500 space-y-1">
+                            {previousOrders.slice(0, 3).map((prevOrder, oIdx) => (
+                              <div key={oIdx} className="py-1 flex justify-between">
+                                <span>Order #{prevOrder.id.slice(0, 8).toUpperCase()} • {prevOrder.items.length} items</span>
+                                <span className="font-bold text-stone-750">{formatCurrency(prevOrder.grandTotal)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {recommendedProduct && (() => {
+                        const isWholesaleUser = user && (user.role === 'wholesale' || user.role === 'admin');
+                        const basePrice = isWholesaleUser ? recommendedProduct.wholesalePrice : (recommendedProduct.discountPrice || recommendedProduct.retailPrice);
+                        const promoPrice = Math.round(basePrice * 0.85);
+
+                        return (
+                          <div className="bg-copper/5 border border-copper/10 rounded-xl p-3 flex items-center justify-between gap-3 text-[10px]">
+                            <div>
+                              <span className="font-bold text-copper uppercase text-[8px] block">Special Deal For Your Next Order!</span>
+                              <span className="font-bold text-stone-800 block mt-0.5">{recommendedProduct.name}</span>
+                              <span className="text-stone-500 block">Get 15% off using Coupon: <strong className="text-copper font-mono">LOYAL15</strong></span>
+                            </div>
+                            <span className="font-mono text-copper font-bold text-xs shrink-0">{formatCurrency(promoPrice)}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {/* Footer Notes */}
                   <div className="border-t pt-4 text-center text-[10px] text-stone-400 space-y-1.5">
                     <p>Our agent will contact you shortly regarding delivery routing.</p>
@@ -705,6 +809,82 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
+                {/* Special Bundle Recommendation Banner */}
+                {recommendedProduct && (() => {
+                  const isWholesaleUser = user && (user.role === 'wholesale' || user.role === 'admin');
+                  const basePrice = isWholesaleUser ? recommendedProduct.wholesalePrice : (recommendedProduct.discountPrice || recommendedProduct.retailPrice);
+                  const promoPrice = Math.round(basePrice * 0.9);
+
+                  return (
+                    <div className="bg-copper/5 border border-copper/20 rounded-2xl p-4 space-y-2.5 mt-2">
+                      <div className="flex items-center gap-1 text-copper text-[9px] font-bold uppercase tracking-wider">
+                        <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Recommended deal for you
+                      </div>
+                      <div className="flex gap-2 items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-[11px] font-bold text-stone-900 truncate">{recommendedProduct.name}</h4>
+                          <p className="text-[9px] text-stone-500 mt-0.5">Bundle this item and save 10% instantly!</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const discountedProduct = {
+                              ...recommendedProduct,
+                              retailPrice: Math.round(recommendedProduct.retailPrice * 0.9),
+                              wholesalePrice: Math.round(recommendedProduct.wholesalePrice * 0.9),
+                              discountPrice: recommendedProduct.discountPrice ? Math.round(recommendedProduct.discountPrice * 0.9) : undefined,
+                              name: recommendedProduct.name + ' (10% Bundle Discount)',
+                            };
+                            addToCart(discountedProduct, 1);
+                            setRecommendedProduct(null);
+                            showToast('Upsell item added with 10% discount!', 'success');
+                          }}
+                          className="bg-copper hover:bg-copper-dark text-white font-bold px-2 py-1 rounded text-[9px] cursor-pointer whitespace-nowrap"
+                        >
+                          + Add for {formatCurrency(promoPrice)}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Mobile Verification Banners */}
+                {(() => {
+                  const isUserVerified = user && user.phoneVerified;
+                  const isPhoneVerified = isUserVerified || isGuestPhoneVerified;
+
+                  if (!isPhoneVerified) {
+                    return (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 space-y-2.5 shadow-sm text-xs mt-3">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <Smartphone className="w-4 h-4 text-amber-600 animate-bounce" />
+                          <span>Mobile Verification Required</span>
+                        </div>
+                        <p className="text-[10px] text-stone-600 leading-relaxed">
+                          To place your order, you must verify your mobile number (<strong>{phone || 'Not provided'}</strong>) via a simulated OTP text message.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={triggerOtpVerification}
+                          className="bg-copper hover:bg-copper-dark text-white font-bold px-3 py-1.5 rounded-lg text-[9px] cursor-pointer shadow-xs transition-colors uppercase tracking-wider block w-max"
+                        >
+                          Verify Mobile via OTP
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-3 flex items-center gap-2 shadow-xs text-xs mt-3">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <span className="font-bold block text-[11px]">Mobile Number Verified</span>
+                          <span className="text-[9px] text-stone-500">Checkout authenticity confirmed. You may proceed.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
+
                 <div className="pt-3">
                   <button
                     type="submit"
@@ -816,6 +996,25 @@ export default function CheckoutPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* OTP Verification Modal Overlay */}
+      {showOtpModal && (
+        <OtpVerificationModal
+          phone={phone}
+          userId={user?.uid || 'guest_checkout'}
+          userProfile={user}
+          onSuccess={(updatedProfile) => {
+            if (user) {
+              updateUserProfile(updatedProfile);
+            } else {
+              setIsGuestPhoneVerified(true);
+            }
+            setShowOtpModal(false);
+          }}
+          onClose={() => setShowOtpModal(false)}
+          showToast={showToast}
+        />
       )}
 
       <Footer />

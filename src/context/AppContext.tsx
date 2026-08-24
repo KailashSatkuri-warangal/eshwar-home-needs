@@ -31,6 +31,7 @@ interface AppContextType {
   logout: () => Promise<void>;
   registerUser: (email: string, pass: string, name: string, role?: string, wholesaleDetails?: any) => Promise<void>;
   updateUserRole: (uid: string, role: string) => Promise<void>;
+  updateUserProfile: (profile: UserProfile) => void;
   
   // Cart actions
   addToCart: (product: Product, quantity: number, variant?: ProductVariant) => void;
@@ -133,11 +134,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showToast('Logged in successfully!', 'success');
     } catch (firebaseError) {
       // 2. If live login fails (e.g., account not created yet), check if it matches the bypass credentials
-      if ((email === 'admin@eshwarhomeneeds.com' || email === 'admin1@eshwarhomeneeds.com') && pass === 'admin123') {
+      if ((email === 'admin@eshwarhomeneeds.com' || email === 'admin1@eshwarhomeneeds.com' || email === 'satkurikailash@gmail.com') && pass === 'admin123') {
         const adminProfile: UserProfile = {
           uid: 'admin_demo_account',
           email: email,
-          displayName: 'ESHwar Admin (Local Bypass)',
+          displayName: 'Satkuri Kailash (Admin Bypass)',
           role: 'admin',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -168,9 +169,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       uid: cred.user.uid,
       email,
       displayName: name,
-      role: (email === 'admin@eshwarhomeneeds.com' || email === 'admin1@eshwarhomeneeds.com') ? 'admin' : (role as any),
+      role: (email === 'admin@eshwarhomeneeds.com' || email === 'admin1@eshwarhomeneeds.com' || email === 'satkurikailash@gmail.com') ? 'admin' : (role as any),
       createdAt: new Date(),
       updatedAt: new Date(),
+      phoneVerified: email === 'satkurikailash@gmail.com',
       ...wholesaleDetails,
     };
 
@@ -331,6 +333,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const updateUserProfile = (profile: UserProfile) => {
+    setUser(profile);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -344,6 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         logout,
         registerUser,
         updateUserRole,
+        updateUserProfile,
         addToCart,
         removeFromCart,
         updateCartQty,

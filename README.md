@@ -125,3 +125,33 @@ npm run build
 ## 10. Live Notifications & Simulated Transactional Emails
 * **Real-time Admin Notifications Center:** Integrated a live-listening Bell Notification center dropdown inside the admin panel toolbar (`src/app/admin/layout.tsx`). The layout subscribes to the database `notifications` collection reactively. When customers submit new orders or scrap requests, a red unread counter badge updates on the bell, and a subtle chime audio alert is played automatically.
 * **Transactional Email Simulation Client:** Created a beautiful "Simulated Email Client" inbox overlay modal in the checkout success view (`src/app/checkout/page.tsx`). Clicking **"View Email Invoice"** opens a realistic webmail client showing a fully styled B2C order confirmation receipt email, including items list breakdowns, taxes/freight calculations, shipping addresses, and payment instructions.
+* **Customer Past Purchases Simulation:** The email confirmation client loads the user's complete history of successful orders from the database, displaying a *"Your Past Purchases with Us"* list at the bottom of the email template to confirm historic transactions.
+* **Product Recommendation System (Push-To-Buy Bundle Offer):** Added a smart category-matching recommendation module inside checkout. It checks items in the cart, matches related categories in the product catalog, and showcases a **"Recommended Deal for You"** card. Clicking **"Add to Cart"** inserts the upsell item at a **10% bundle discount** and updates checkout subtotals in real-time. In addition, the transactional email template dynamically generates a 15% discount coupon code targeting the same recommendation for the customer's next purchase.
+
+---
+
+## 11. User Cleanse & Master Admin Provisioning
+* **Master Admin Authorization:** Configured the platform privilege gates in the React Context (`src/context/AppContext.tsx`) and layouts (`src/app/admin/layout.tsx`) to authorize the email **`satkurikailash@gmail.com`** as a master administrator. Signing up or logging in with this email automatically grants full back-office access.
+* **Database Cleanse Script (`scripts/reset-users.js`)**: Created a backend provisioning script to erase all existing Firebase Auth users and Firestore `users` records and write a fresh master admin profile document for `satkurikailash@gmail.com` (configured with phone `8309740722` and master role `admin`).
+* **Secure Web Reset Endpoint (`/api/admin/clean-users`)**: Added a secure production API route. Since Vercel has your real private key cert configured in its dashboard settings, you can trigger a wipe of your live production database by visiting:
+  `https://<your-vercel-domain>/api/admin/clean-users?secret=eshwar_reset_2026`
+* **Local Script Execution**:
+  If running on your local machine, download your service account JSON file from Firebase Console, add its cert values (`FIREBASE_PRIVATE_KEY` and `FIREBASE_CLIENT_EMAIL`) to your `.env.local`, and run:
+  ```bash
+  node scripts/reset-users.js
+  ```
+
+---
+
+## 12. Password Reset & Update Controls
+* **Unauthenticated "Forgot Password" Recovery:** Integrated a **"Forgot Password?"** action link directly under the login password input field on the storefront login view. Customers or admins who cannot log in can input their email and dispatch a secure password reset link directly to their inbox via Firebase Auth.
+* **Authenticated Password Change Center:** Added a new **"Password & Security"** tab section inside the customer dashboard panel (`src/app/account/page.tsx`). Logged-in users can update their account password directly by typing a new secure credentials set.
+* **Fallback Verification Link:** If the active session is old (which blocks direct updates due to reauthentication rules), users can click the alternative dispatch button to send a recovery link directly to their verified email address without signing out.
+
+---
+
+## 13. Mobile OTP Verification Gate (Fraud Prevention)
+* **Checkout Order Placement Gate:** Gated order placements behind a mobile number OTP check. Users (whether guests or registered) are blocked from clicking **"Place Order & Pay"** until their 10-digit Indian mobile number is verified.
+* **Smart OTP Simulator Modal:** Included a verification overlay popup (`src/components/ui/OtpVerificationModal.tsx`). Clicking **"Verify Mobile via OTP"** generates a random 6-digit verification code, prints the code in a simulated SMS toast, and requests verification entry.
+* **Verify Later Profile Integration:** Added a verification status indicator inside the My Account profile view (`src/app/account/page.tsx`). Unverified users can click **"Verify Now"** to complete verification at any time. Verified status is saved persistently in their Firestore profile document.
+* **Admin Verification Bypass:** The master admin email **`satkurikailash@gmail.com`** automatically registers with `phoneVerified: true` by default to bypass redundant code prompts.

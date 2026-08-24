@@ -13,9 +13,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { MOCK_PRODUCTS } from '@/lib/mockData';
+import OtpVerificationModal from '@/components/ui/OtpVerificationModal';
 
 export default function AccountPage() {
-  const { user, userLoading, login, logout, registerUser, wishlist, showToast } = useApp();
+  const { user, userLoading, login, logout, registerUser, wishlist, showToast, updateUserProfile } = useApp();
   
   // Auth Form States
   const [isRegister, setIsRegister] = useState(false);
@@ -31,7 +32,7 @@ export default function AccountPage() {
   const [customerType, setCustomerType] = useState<CustomerType>('retailer');
 
   // Customer Panel States
-  const [activeTab, setActiveTab] = useState<'orders' | 'quotes' | 'scrap' | 'wishlist' | 'profile'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'quotes' | 'scrap' | 'wishlist' | 'profile' | 'security'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [scraps, setScraps] = useState<ScrapRequest[]>([]);
@@ -40,6 +41,12 @@ export default function AccountPage() {
   // UTR and Repayment States
   const [utrInput, setUtrInput] = useState<Record<string, string>>({});
   const [submittingUtrMap, setSubmittingUtrMap] = useState<Record<string, boolean>>({});
+
+  // Security / Password Reset States
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [submittingSecurity, setSubmittingSecurity] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
 
   // Fetch histories in real-time when user changes
   useEffect(() => {
@@ -287,6 +294,70 @@ export default function AccountPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
+    if (newPassword.length < 6) {
+      showToast('Password must be at least 6 characters long.', 'error');
+      return;
+    }
+
+    setSubmittingSecurity(true);
+    try {
+      const { updatePassword } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase/config');
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, newPassword);
+        showToast('Password updated successfully!', 'success');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        throw new Error('No logged-in authentication session found.');
+      }
+    } catch (err) {
+      console.error(err);
+      if ((err as Error).message.includes('auth/requires-recent-login')) {
+        showToast('Requires recent login. Please sign out, sign back in, and try again, or use the reset link email.', 'error');
+      } else {
+        showToast((err as Error).message || 'Failed to update password.', 'error');
+      }
+    } finally {
+      setSubmittingSecurity(false);
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!user?.email) return;
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase/config');
+      await sendPasswordResetEmail(auth, user.email);
+      showToast(`Password reset link dispatched to ${user.email}!`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to send reset link email.', 'error');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email || !email.trim()) {
+      showToast('Please type your email address first in the input field above.', 'error');
+      return;
+    }
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase/config');
+      await sendPasswordResetEmail(auth, email.trim());
+      showToast(`Password reset link sent to ${email.trim()}! Please check your inbox.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Error sending reset link: ' + (err as Error).message, 'error');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'DELIVERED':
@@ -394,6 +465,18 @@ export default function AccountPage() {
                   className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none"
                 />
               </div>
+
+              {!isRegister && (
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-[10px] font-bold text-copper hover:underline cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
 
               {/* Wholesale Registration subform */}
               {isRegister && (
@@ -562,6 +645,15 @@ export default function AccountPage() {
               }`}
             >
               <User className="w-4 h-4" /> Profile &amp; Addresses
+            </button>
+
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors ${
+                activeTab === 'security' ? 'bg-copper text-white' : 'hover:bg-stone-100 text-stone-600'
+              }`}
+            >
+              <Key className="w-4 h-4" /> Password &amp; Security
             </button>
           </div>
 
@@ -844,7 +936,25 @@ export default function AccountPage() {
                       <p>Full Name: <strong className="text-stone-800">{user.displayName}</strong></p>
                       <p>Registered Email: <strong className="text-stone-800">{user.email}</strong></p>
                       <p>Verification Role: <strong className="text-stone-800 capitalize">{user.role}</strong></p>
-                      {user.phone && <p>Registered Phone: <strong className="text-stone-800">{user.phone}</strong></p>}
+                      {user.phone && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>Registered Phone: <strong className="text-stone-800">{user.phone}</strong></span>
+                          {user.phoneVerified ? (
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Verified</span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Unverified</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowOtpModal(true)}
+                                className="text-[10px] text-copper font-bold hover:underline cursor-pointer"
+                              >
+                                Verify Now
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {user.role === 'wholesale' && (
@@ -858,6 +968,63 @@ export default function AccountPage() {
                     )}
                   </div>
                 )}
+
+                {/* 6. SECURITY / PASSWORD TAB */}
+                {activeTab === 'security' && (
+                  <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-6">
+                    <div>
+                      <h3 className="font-bold text-stone-900 text-sm border-b border-stone-100 pb-2 font-serif">Password &amp; Security</h3>
+                      <p className="text-xs text-stone-500 mt-1">Configure your login credentials and trigger recovery emails</p>
+                    </div>
+
+                    {/* Change Password Form */}
+                    <form onSubmit={handleChangePassword} className="space-y-4 text-xs text-stone-650 max-w-sm">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-stone-500 block">New Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-stone-500 block">Confirm New Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                          className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2.5 focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submittingSecurity}
+                        className="bg-copper hover:bg-copper-dark text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        {submittingSecurity ? 'Updating...' : 'Update Password'}
+                      </button>
+                    </form>
+
+                    <div className="border-t border-stone-100 pt-5 space-y-3">
+                      <h4 className="font-bold text-stone-800 text-xs">Alternative Verification Option</h4>
+                      <p className="text-xs text-stone-500 leading-relaxed">
+                        If you are unable to change your password directly (which requires a recently logged-in session), click below to receive a secure recovery email containing a reset link.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSendResetEmail}
+                        className="bg-stone-900 hover:bg-black text-white font-semibold px-4 py-2 rounded-lg text-xs cursor-pointer transition-colors"
+                      >
+                        Send Reset Link to {user.email}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -865,6 +1032,20 @@ export default function AccountPage() {
         </div>
 
       </main>
+
+      {showOtpModal && user && user.phone && (
+        <OtpVerificationModal
+          phone={user.phone}
+          userId={user.uid}
+          userProfile={user}
+          onSuccess={(updatedProfile) => {
+            updateUserProfile(updatedProfile);
+            setShowOtpModal(false);
+          }}
+          onClose={() => setShowOtpModal(false)}
+          showToast={showToast}
+        />
+      )}
 
       <Footer />
     </div>

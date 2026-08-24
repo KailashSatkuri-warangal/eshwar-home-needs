@@ -58,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // 2. Privilege Security Gate
   // Allow if user is admin or staff. For development, we bypass if email matches admin template.
-  const isAuthorized = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com');
+  const isAuthorized = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'satkurikailash@gmail.com');
 
   if (!isAuthorized) {
     return (
@@ -82,8 +82,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
-  const isStaffOrAdmin = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com');
+  const isAdminUser = user && (user.role === 'admin' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com' || user.email === 'satkurikailash@gmail.com');
+  const isStaffOrAdmin = user && (user.role === 'admin' || user.role === 'staff' || user.email === 'admin@eshwarhomeneeds.com' || user.email === 'admin1@eshwarhomeneeds.com' || user.email === 'satkurikailash@gmail.com');
 
   const menuItems = [
     { name: 'Dashboard Analytics', href: '/admin', icon: BarChart3 },

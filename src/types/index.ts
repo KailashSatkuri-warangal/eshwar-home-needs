@@ -13,6 +13,7 @@ export interface UserProfile {
   role: UserRole;
   displayName: string;
   phone?: string;
+  phoneVerified?: boolean;
   createdAt: any;
   updatedAt: any;
   creditTerms?: string; // Admin controlled
