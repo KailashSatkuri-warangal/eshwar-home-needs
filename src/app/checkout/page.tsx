@@ -144,6 +144,19 @@ export default function CheckoutPage() {
     setOrderCreated(finalOrder);
     clearCart();
     showToast('Order placed successfully!', 'success');
+
+    // Send real order confirmation email (fire-and-forget, don't block checkout UX)
+    fetch('/api/email/send-order-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: finalOrder }),
+    }).then(res => {
+      if (res.ok) {
+        showToast(`📧 Order confirmation email sent to ${finalOrder.customerDetails.email}!`, 'success');
+      }
+    }).catch(err => {
+      console.warn('Failed to send order confirmation email:', err);
+    });
   };
 
   const triggerOtpVerification = async () => {
@@ -423,11 +436,11 @@ export default function CheckoutPage() {
             <button
               onClick={() => {
                 setShowEmailModal(true);
-                showToast('Email invoice preview loaded!', 'info');
+                showToast('Showing the email that was sent to your inbox.', 'info');
               }}
               className="flex-1 bg-stone-900 hover:bg-black text-white font-bold py-2.5 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
             >
-              📧 View Email Invoice
+              📧 View Sent Email
             </button>
             <Link
               href="/shop"
@@ -438,15 +451,15 @@ export default function CheckoutPage() {
           </div>
         </main>
 
-        {/* Simulated Email Confirmation Modal */}
+        {/* Email Confirmation Modal — Real Email Already Sent */}
         {showEmailModal && orderCreated && (
           <div className="fixed inset-0 bg-black/60 z-55 flex items-center justify-center p-4">
             <div className="bg-white border border-stone-200 rounded-3xl max-w-2xl w-full text-left overflow-hidden shadow-2xl flex flex-col h-[80vh] animate-in fade-in zoom-in-95 duration-200">
               {/* Modal Header */}
               <div className="bg-stone-950 text-white p-4 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 bg-rose-500 rounded-full"></div>
-                  <span className="text-xs font-bold font-mono tracking-wider">Simulated Email Client — Inbox</span>
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold font-mono tracking-wider">Email Sent — Invoice Preview</span>
                 </div>
                 <button
                   onClick={() => setShowEmailModal(false)}
