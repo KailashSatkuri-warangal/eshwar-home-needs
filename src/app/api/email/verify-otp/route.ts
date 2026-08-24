@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { db } from '@/lib/firebase/config';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export async function POST(request: Request) {
   try {
@@ -12,10 +13,11 @@ export async function POST(request: Request) {
     let savedOtp: string | null = null;
     let savedExpiry: string | null = null;
 
-    // 1. Fetch verification details from Firestore
+    // 1. Fetch verification details from Firestore using client config SDK
     if (userId && userId !== 'guest_checkout' && userId !== 'guest_scrap') {
-      const userSnap = await adminDb.collection('users').doc(userId).get();
-      if (!userSnap.exists) {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
         return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
       }
       const uData = userSnap.data();
@@ -23,8 +25,9 @@ export async function POST(request: Request) {
       savedExpiry = uData?.tempOtpExpires || null;
     } else {
       // Guest
-      const guestSnap = await adminDb.collection('guest_otps').doc(email.trim().toLowerCase()).get();
-      if (!guestSnap.exists) {
+      const guestRef = doc(db, 'guest_otps', email.trim().toLowerCase());
+      const guestSnap = await getDoc(guestRef);
+      if (!guestSnap.exists()) {
         return NextResponse.json({ error: 'Verification session expired. Please request a new OTP.' }, { status: 400 });
       }
       const gData = guestSnap.data();
@@ -55,13 +58,15 @@ export async function POST(request: Request) {
         phoneVerified: true,
         tempOtpCode: null,
         tempOtpExpires: null,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       };
-      // Save changes securely server-side
-      await adminDb.collection('users').doc(userId).set(updatedProfile);
+      // Save changes securely server-side using client config SDK
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, updatedProfile);
     } else {
       // Clear guest temp validation
-      await adminDb.collection('guest_otps').doc(email.trim().toLowerCase()).delete();
+      const guestRef = doc(db, 'guest_otps', email.trim().toLowerCase());
+      await deleteDoc(guestRef);
     }
 
     return NextResponse.json({ 

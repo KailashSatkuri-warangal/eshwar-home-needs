@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { db } from '@/lib/firebase/config';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { sendEmail } from '@/lib/services/email';
 
 export async function POST(request: Request) {
@@ -14,15 +15,17 @@ export async function POST(request: Request) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min expiry
 
-    // 2. Save validation credentials in Firestore
+    // 2. Save validation credentials in Firestore using client config SDK
     if (userId && userId !== 'guest_checkout' && userId !== 'guest_scrap') {
-      await adminDb.collection('users').doc(userId).update({
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
         tempOtpCode: code,
         tempOtpExpires: expiry,
       });
     } else {
       // Save guest validation credentials mapped to email
-      await adminDb.collection('guest_otps').doc(email.trim().toLowerCase()).set({
+      const guestRef = doc(db, 'guest_otps', email.trim().toLowerCase());
+      await setDoc(guestRef, {
         tempOtpCode: code,
         tempOtpExpires: expiry,
       });
