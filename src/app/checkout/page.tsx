@@ -15,6 +15,10 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [orderCreated, setOrderCreated] = useState<Order | null>(null);
 
+  // Simulation states
+  const [showMockPaymentModal, setShowMockPaymentModal] = useState(false);
+  const [pendingMockOrder, setPendingMockOrder] = useState<Order | null>(null);
+
   // Form Fields
   const [name, setName] = useState(user?.displayName || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -58,6 +62,36 @@ export default function CheckoutPage() {
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+  };
+
+  const executeDatabaseWrites = async (finalOrder: Order) => {
+    // 1. Create order record
+    await setDbDoc('orders', finalOrder.id, finalOrder);
+
+    // 2. Create notifications alerts
+    const notificationId = `notif_${Math.random().toString(36).substring(2, 9)}`;
+    const notifData = {
+      id: notificationId,
+      recipientId: 'admin',
+      title: 'New Order Placed',
+      message: `Customer ${name} placed order ${finalOrder.id.toUpperCase()} for ₹${cart.grandTotal.toFixed(0)}.`,
+      type: 'order',
+      read: false,
+      createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
+    };
+    await setDbDoc('notifications', notificationId, notifData);
+
+    // Trigger Confetti locally for premium UX
+    try {
+      const confetti = (await import('canvas-confetti')).default;
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    } catch (err) {
+      console.error(err);
+    }
+
+    setOrderCreated(finalOrder);
+    clearCart();
+    showToast('Order placed successfully!', 'success');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,35 +157,7 @@ export default function CheckoutPage() {
         updatedAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
       };
 
-      const executeDatabaseWrites = async (finalOrder: Order) => {
-        // 1. Create order record
-        await setDbDoc('orders', orderId, finalOrder);
 
-        // 2. Create notifications alerts
-        const notificationId = `notif_${Math.random().toString(36).substring(2, 9)}`;
-        const notifData = {
-          id: notificationId,
-          recipientId: 'admin',
-          title: 'New Order Placed',
-          message: `Customer ${name} placed order ${orderId.toUpperCase()} for ₹${cart.grandTotal.toFixed(0)}.`,
-          type: 'order',
-          read: false,
-          createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
-        };
-        await setDbDoc('notifications', notificationId, notifData);
-
-        // Trigger Confetti locally for premium UX
-        try {
-          const confetti = (await import('canvas-confetti')).default;
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        } catch (err) {
-          console.error(err);
-        }
-
-        setOrderCreated(finalOrder);
-        clearCart();
-        showToast('Order placed successfully!', 'success');
-      };
 
       if (paymentMethod === 'ONLINE') {
         const res = await fetch('/api/payment/razorpay', {
@@ -166,16 +172,9 @@ export default function CheckoutPage() {
         }
 
         if (paymentOrder.isMock) {
-          showToast('Razorpay keys not configured. Simulating successful checkout.', 'info');
-          const finalMockOrder = {
-            ...newOrder,
-            paymentDetails: {
-              method: 'ONLINE' as const,
-              status: 'SUCCESS' as const,
-              transactionId: `mock_txn_${Math.random().toString(36).substring(2, 9)}`,
-            }
-          };
-          await executeDatabaseWrites(finalMockOrder);
+          showToast('Razorpay keys not configured. Entering payment simulation...', 'info');
+          setPendingMockOrder(newOrder);
+          setShowMockPaymentModal(true);
           setLoading(false);
           return;
         }
@@ -188,7 +187,7 @@ export default function CheckoutPage() {
         }
 
         const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_your_key_id',
+          key: paymentOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_your_key_id',
           amount: paymentOrder.amount,
           currency: paymentOrder.currency,
           name: 'ESHwar Home Needs',
@@ -460,19 +459,26 @@ export default function CheckoutPage() {
                   </label>
 
                   {/* Online */}
-                  <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
-                    paymentMethod === 'ONLINE' ? 'border-copper bg-copper/5 text-copper' : 'border-stone-200 hover:border-copper/40'
-                  }`}>
-                    <input 
-                      type="radio" 
-                      name="payment" 
-                      className="sr-only"
-                      checked={paymentMethod === 'ONLINE'}
-                      onChange={() => setPaymentMethod('ONLINE')}
-                    />
-                    <CreditCard className="w-5 h-5" />
-                    <span>Razorpay / UPI</span>
-                  </label>
+                  {(!user || (user.role !== 'staff' && user.role !== 'admin')) ? (
+                    <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
+                      paymentMethod === 'ONLINE' ? 'border-copper bg-copper/5 text-copper' : 'border-stone-200 hover:border-copper/40'
+                    }`}>
+                      <input 
+                        type="radio" 
+                        name="payment" 
+                        className="sr-only"
+                        checked={paymentMethod === 'ONLINE'}
+                        onChange={() => setPaymentMethod('ONLINE')}
+                      />
+                      <CreditCard className="w-5 h-5" />
+                      <span>Razorpay / UPI</span>
+                    </label>
+                  ) : (
+                    <div className="border border-stone-200 bg-stone-50 rounded-xl p-4 flex flex-col items-center justify-center gap-2 opacity-50 cursor-not-allowed select-none">
+                      <CreditCard className="w-5 h-5 text-stone-400" />
+                      <span className="text-[10px] text-center font-bold text-stone-400">Razorpay (Disabled for Staff/Admin)</span>
+                    </div>
+                  )}
 
                   {/* NEFT */}
                   <label className={`border rounded-xl p-4 flex flex-col items-center justify-between cursor-pointer gap-2 transition-all select-none ${
@@ -571,6 +577,80 @@ export default function CheckoutPage() {
         )}
 
       </main>
+
+      {/* Mock Payment Simulation Modal */}
+      {showMockPaymentModal && pendingMockOrder && (
+        <div className="fixed inset-0 bg-black/60 z-55 flex items-center justify-center p-4">
+          <div className="bg-white border border-stone-200 rounded-3xl p-6 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-stone-900 font-serif">Simulated Payment Gateway</h3>
+              <p className="text-xs text-stone-500">
+                You are checking out in <strong>Simulation Mode</strong> because Razorpay API keys are not loaded on your local server.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 p-4 rounded-2xl text-xs text-left space-y-2 border border-stone-100">
+              <div className="flex justify-between font-semibold">
+                <span>Amount:</span>
+                <span className="text-stone-900">{formatCurrency(pendingMockOrder.grandTotal)}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Simulation Order ID:</span>
+                <span className="text-stone-900">{pendingMockOrder.id.toUpperCase()}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  const finalMockOrder = {
+                    ...pendingMockOrder,
+                    paymentDetails: {
+                      method: 'ONLINE' as const,
+                      status: 'SUCCESS' as const,
+                      transactionId: `mock_txn_${Math.random().toString(36).substring(2, 9)}`,
+                    }
+                  };
+                  await executeDatabaseWrites(finalMockOrder);
+                  setShowMockPaymentModal(false);
+                  setLoading(false);
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-xs uppercase cursor-pointer transition-colors"
+              >
+                Simulate Success
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  showToast('Payment simulation failed.', 'error');
+                  setShowMockPaymentModal(false);
+                }}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg text-xs uppercase cursor-pointer transition-colors"
+              >
+                Simulate Failure
+              </button>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setShowMockPaymentModal(false);
+                showToast('Payment simulation cancelled.', 'info');
+              }}
+              className="text-stone-400 hover:text-stone-600 text-[10px] font-bold block mx-auto underline cursor-pointer"
+            >
+              Cancel Payment
+            </button>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

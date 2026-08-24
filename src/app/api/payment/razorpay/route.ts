@@ -19,6 +19,7 @@ export async function POST(request: Request) {
         id: `order_mock_${Math.random().toString(36).substring(2, 9)}`,
         amount: Math.round(amount * 100),
         currency: 'INR',
+        keyId: keyId || 'rzp_test_your_key_id',
         isMock: true,
       });
     }
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       id: order.id,
       amount: order.amount,
       currency: order.currency,
+      keyId: keyId,
       isMock: false,
     });
   } catch (error) {

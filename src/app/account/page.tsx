@@ -5,11 +5,11 @@ import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
 import { useApp } from '@/context/AppContext';
 import { Order, Quote, ScrapRequest, CustomerType, Product } from '@/types';
-import { getDbDocsFiltered } from '@/lib/services/db';
+import { getDbDocsFiltered, setDbDoc } from '@/lib/services/db';
 import { generateInvoicePDF, generateQuotationPDF } from '@/lib/services/invoice';
 import { 
   User, Package, FileText, Scale, Heart, LogOut, Key, 
-  MapPin, CheckCircle, Clock, AlertTriangle, ChevronRight, Eye, RotateCw
+  MapPin, CheckCircle, Clock, AlertTriangle, ChevronRight, Eye, RotateCw, CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
 import { MOCK_PRODUCTS } from '@/lib/mockData';
@@ -36,6 +36,10 @@ export default function AccountPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [scraps, setScraps] = useState<ScrapRequest[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  
+  // UTR and Repayment States
+  const [utrInput, setUtrInput] = useState<Record<string, string>>({});
+  const [submittingUtrMap, setSubmittingUtrMap] = useState<Record<string, boolean>>({});
 
   // Fetch histories when user changes
   useEffect(() => {
@@ -127,11 +131,148 @@ export default function AccountPage() {
     showToast('Quotation PDF downloaded!', 'success');
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayAgain = async (order: Order) => {
+    setLoadingHistory(true);
+    try {
+      // 1. Fetch Razorpay Order from server api
+      const res = await fetch('/api/payment/razorpay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: order.grandTotal, receipt: order.id })
+      });
+      const paymentOrder = await res.json();
+
+      if (paymentOrder.error) {
+        throw new Error(paymentOrder.error);
+      }
+
+      if (paymentOrder.isMock) {
+        showToast('Razorpay simulation: Payment successful!', 'success');
+        // Update order status to paid
+        const updatedOrder: Order = {
+          ...order,
+          paymentDetails: {
+            ...order.paymentDetails,
+            status: 'SUCCESS',
+            transactionId: `mock_txn_${Math.random().toString(36).substring(2, 9)}`,
+          }
+        };
+        await setDbDoc('orders', order.id, updatedOrder);
+        // Refresh orders list
+        setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
+        setLoadingHistory(false);
+        return;
+      }
+
+      const isScriptLoaded = await loadRazorpayScript();
+      if (!isScriptLoaded) {
+        showToast('Failed to load Razorpay SDK.', 'error');
+        setLoadingHistory(false);
+        return;
+      }
+
+      const options = {
+        key: paymentOrder.keyId || 'rzp_test_your_key_id',
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: 'ESHwar Home Needs',
+        description: 'Repay Order #' + order.id.slice(0, 8).toUpperCase(),
+        order_id: paymentOrder.id,
+        handler: async function (response: any) {
+          try {
+            const updatedOrder: Order = {
+              ...order,
+              paymentDetails: {
+                ...order.paymentDetails,
+                status: 'SUCCESS',
+                transactionId: response.razorpay_payment_id,
+              }
+            };
+            await setDbDoc('orders', order.id, updatedOrder);
+            setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
+            showToast('Payment successful! Order updated.', 'success');
+          } catch (err) {
+            console.error('Error saving payment reference:', err);
+            showToast('Payment succeeded, but failed to update order record.', 'error');
+          } finally {
+            setLoadingHistory(false);
+          }
+        },
+        prefill: {
+          name: user?.displayName || '',
+          email: user?.email || '',
+        },
+        theme: {
+          color: '#b87333',
+        },
+        modal: {
+          ondismiss: function () {
+            showToast('Repayment window closed.', 'info');
+            setLoadingHistory(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+      showToast('Repayment initialization failed. Please try again.', 'error');
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleUtrSubmit = async (orderId: string, utrValue: string) => {
+    if (!utrValue || !utrValue.trim()) {
+      showToast('Please enter a valid UTR or Transaction number.', 'error');
+      return;
+    }
+
+    setSubmittingUtrMap(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const orderToUpdate = orders.find(o => o.id === orderId);
+      if (!orderToUpdate) return;
+
+      const updatedOrder: Order = {
+        ...orderToUpdate,
+        paymentDetails: {
+          ...orderToUpdate.paymentDetails,
+          status: 'PENDING',
+          transactionId: utrValue.trim().toUpperCase(),
+        }
+      };
+
+      await setDbDoc('orders', orderId, updatedOrder);
+      setOrders(orders.map(o => o.id === orderId ? updatedOrder : o));
+      showToast('Payment reference submitted for verification!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to submit reference.', 'error');
+    } finally {
+      setSubmittingUtrMap(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'DELIVERED':
       case 'ACCEPTED':
       case 'PAYMENT_COMPLETED':
+      case 'SUCCESS':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
       case 'CANCELLED':
       case 'REJECTED':
@@ -139,6 +280,8 @@ export default function AccountPage() {
       case 'PLACED':
       case 'REQUESTED':
         return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'VERIFICATION_PENDING':
+        return 'bg-amber-100 text-amber-800 border-amber-200 animate-pulse';
       default:
         return 'bg-amber-100 text-amber-800 border-amber-200';
     }
@@ -443,14 +586,84 @@ export default function AccountPage() {
                               ))}
                             </div>
 
-                            <div className="flex items-center justify-between pt-2 border-t border-stone-100 font-bold text-stone-900">
-                              <span>Grand Total: ₹{ord.grandTotal.toFixed(0)}</span>
-                              <button
-                                onClick={() => handleInvoiceDownload(ord)}
-                                className="text-[10px] text-copper hover:underline flex items-center gap-1 cursor-pointer font-bold border border-copper/35 rounded px-2.5 py-1"
-                              >
-                                <FileText className="w-3.5 h-3.5" /> Invoice PDF
-                              </button>
+                            {/* Payment Status Info Block */}
+                            <div className="bg-stone-50/50 p-2.5 rounded-lg border border-stone-100 flex flex-wrap justify-between items-center gap-2 text-[10px]">
+                              <div>
+                                <span className="text-stone-400 block uppercase font-bold">Payment Method</span>
+                                <span className="font-bold text-stone-700">{ord.paymentDetails?.method === 'ONLINE' ? 'Razorpay / UPI' : ord.paymentDetails?.method === 'NEFT_RTGS' ? 'Bank Transfer (NEFT/RTGS)' : 'Cash on Delivery (COD)'}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-stone-400 block uppercase font-bold">Payment Status</span>
+                                <span className={`font-bold uppercase ${
+                                  ord.paymentDetails?.status === 'SUCCESS' ? 'text-emerald-600' : (ord.paymentDetails?.status === 'PENDING' && ord.paymentDetails?.transactionId) ? 'text-amber-600' : 'text-rose-600'
+                                }`}>
+                                  {(ord.paymentDetails?.status === 'PENDING' && ord.paymentDetails?.transactionId) ? 'VERIFICATION PENDING' : (ord.paymentDetails?.status || 'PENDING')}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Actions & Repayment Buttons */}
+                            <div className="flex flex-col gap-3 pt-2 border-t border-stone-100">
+                              <div className="flex items-center justify-between font-bold text-stone-900">
+                                <span>Grand Total: ₹{ord.grandTotal.toFixed(0)}</span>
+                                <button
+                                  onClick={() => handleInvoiceDownload(ord)}
+                                  className="text-[10px] text-copper hover:underline flex items-center gap-1 cursor-pointer font-bold border border-copper/35 rounded px-2.5 py-1"
+                                >
+                                  <FileText className="w-3.5 h-3.5" /> Invoice PDF
+                                </button>
+                              </div>
+
+                              {/* Repay online if status is PENDING/FAILED for ONLINE orders */}
+                              {ord.paymentDetails?.method === 'ONLINE' && ord.paymentDetails?.status !== 'SUCCESS' && !(ord.paymentDetails?.status === 'PENDING' && ord.paymentDetails?.transactionId) && (
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePayAgain(ord)}
+                                    className="flex-1 bg-copper hover:bg-copper-dark text-white font-bold py-2 rounded text-[10px] uppercase flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5" /> Pay Online Again
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* NEFT/RTGS UTR Reference Submission */}
+                              {ord.paymentDetails?.status !== 'SUCCESS' && (
+                                <>
+                                  {(ord.paymentDetails?.status === 'PENDING' && ord.paymentDetails?.transactionId) ? (
+                                    <div className="bg-amber-50 border border-amber-200/50 rounded-lg p-2.5 text-amber-800 text-[10px] flex items-center gap-1.5">
+                                      <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                                      <div>
+                                        <p className="font-bold">Verification Reference Submitted</p>
+                                        <p className="mt-0.5">Reference / UTR: <strong className="text-stone-800">{ord.paymentDetails?.transactionId}</strong>. Awaiting Admin confirmation.</p>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                                      <div className="flex-1 w-full">
+                                        <label className="text-[9px] font-bold text-stone-400 block mb-0.5">
+                                          {ord.paymentDetails?.method === 'NEFT_RTGS' ? 'Bank Transfer UTR Reference' : 'Razorpay UTR / Txn Reference (if already paid)'}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          placeholder="e.g. UTR123456789012"
+                                          value={utrInput[ord.id] || ''}
+                                          onChange={(e) => setUtrInput(prev => ({ ...prev, [ord.id]: e.target.value }))}
+                                          className="w-full bg-white border border-stone-300 rounded px-2.5 py-1.5 focus:outline-none text-xs font-semibold uppercase"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={submittingUtrMap[ord.id]}
+                                        onClick={() => handleUtrSubmit(ord.id, utrInput[ord.id] || '')}
+                                        className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white font-bold px-4 py-2 rounded text-[10px] uppercase cursor-pointer disabled:opacity-50"
+                                      >
+                                        {submittingUtrMap[ord.id] ? 'Submitting...' : 'Submit UTR / Ref'}
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
