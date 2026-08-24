@@ -146,12 +146,28 @@ export default function CheckoutPage() {
     showToast('Order placed successfully!', 'success');
   };
 
-  const triggerOtpVerification = () => {
+  const triggerOtpVerification = async () => {
     if (!phone || !phone.match(/^(?:\+91|0)?[6-9]\d{9}$/)) {
       showToast('Please type a valid 10-digit Indian mobile number first in the contact details form.', 'error');
       setCheckoutError('Please enter a valid mobile number in Step 1 to send verification OTP.');
       return;
     }
+
+    try {
+      // Enforce phone uniqueness across verified users ("only one number one time")
+      const allUsers = await getDbDocs('users');
+      const phoneTaken = allUsers.some(
+        (u: any) => u.uid !== user?.uid && u.phone === phone.trim() && u.phoneVerified
+      );
+      if (phoneTaken) {
+        showToast('This phone number is already verified by another account.', 'error');
+        setCheckoutError('This phone number is already registered and verified by another user.');
+        return;
+      }
+    } catch (e) {
+      console.warn('Error checking phone uniqueness:', e);
+    }
+
     setCheckoutError(null);
     setShowOtpModal(true);
   };

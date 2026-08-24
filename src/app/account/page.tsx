@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
 import { useApp } from '@/context/AppContext';
-import { Order, Quote, ScrapRequest, CustomerType, Product } from '@/types';
-import { getDbDocsFiltered, setDbDoc, subscribeDbDocsFiltered } from '@/lib/services/db';
+import { Order, Quote, ScrapRequest, CustomerType, Product, UserProfile } from '@/types';
+import { getDbDocsFiltered, setDbDoc, subscribeDbDocsFiltered, getDbDocs } from '@/lib/services/db';
 import { generateInvoicePDF, generateQuotationPDF } from '@/lib/services/invoice';
 import { 
   User, Package, FileText, Scale, Heart, LogOut, Key, 
@@ -302,15 +302,24 @@ export default function AccountPage() {
     e.preventDefault();
     if (!user) return;
     const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
-    if (!phoneRegex.test(editPhoneInput.trim())) {
+    const formattedPhone = editPhoneInput.trim();
+    if (!phoneRegex.test(formattedPhone)) {
       showToast('Please enter a valid 10-digit mobile number.', 'error');
       return;
     }
 
     try {
+      // Enforce phone uniqueness across verified users ("only one number one time")
+      const allUsers = await getDbDocs('users') as UserProfile[];
+      const phoneTaken = allUsers.some(u => u.uid !== user.uid && u.phone === formattedPhone && u.phoneVerified);
+      if (phoneTaken) {
+        showToast('This phone number is already verified by another account.', 'error');
+        return;
+      }
+
       const updatedProfile = {
         ...user,
-        phone: editPhoneInput.trim(),
+        phone: formattedPhone,
         phoneVerified: false, // Reset verification flag on edits!
         updatedAt: new Date()
       };

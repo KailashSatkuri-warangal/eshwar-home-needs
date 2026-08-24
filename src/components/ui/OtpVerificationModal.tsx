@@ -29,7 +29,6 @@ export default function OtpVerificationModal({
   const [verifying, setVerifying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
-  const [fallbackOtp, setFallbackOtp] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -57,7 +56,6 @@ export default function OtpVerificationModal({
 
   const handleSendOtp = async () => {
     setLoading(true);
-    setFallbackOtp(null);
     try {
       // 1. Format the phone number to ensure +91 prefix for Indian numbers if not already present
       let formattedPhone = phone.trim();
@@ -103,20 +101,8 @@ export default function OtpVerificationModal({
     } catch (err) {
       console.error('Error sending OTP:', err);
       const errMsg = (err as Error).message;
-      
-      // Check if SMS is blocked due to Google Cloud regional policy settings (operation-not-allowed)
-      if (
-        errMsg.includes('region') || 
-        errMsg.includes('operation-not-allowed') || 
-        errMsg.includes('unable to be sent') || 
-        errMsg.includes('SMS')
-      ) {
-        // Fall back to simulated verification code bypass
-        const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-        setFallbackOtp(fallbackCode);
-        setOtpSent(true);
-        setTimer(60);
-        showToast('Firebase SMS restricted by regional settings. Switched to testing bypass code.', 'info');
+      if (errMsg.includes('auth/operation-not-allowed')) {
+        showToast('Phone provider settings blocked in GCP. Enable India (+91) region under SMS Region Policy inside Identity Platform settings!', 'error');
       } else {
         showToast('Failed to send SMS: ' + errMsg, 'error');
       }
@@ -131,57 +117,37 @@ export default function OtpVerificationModal({
       showToast('Please enter the 6-digit OTP code.', 'error');
       return;
     }
+    if (!confirmationResult) {
+      showToast('No active verification session found. Please request a new OTP.', 'error');
+      return;
+    }
 
     setVerifying(true);
     try {
-      if (fallbackOtp) {
-        // Verify against local simulated bypass code
-        if (otpCode === fallbackOtp) {
-          const updatedProfile = {
-            ...userProfile,
-            phone,
-            phoneVerified: true,
-            updatedAt: new Date()
-          };
-          
-          await setDbDoc('users', userId, updatedProfile);
-          showToast('Mobile number verified successfully (Bypass Fallback)!', 'success');
-          setFallbackOtp(null);
-          onSuccess(updatedProfile);
-        } else {
-          showToast('Invalid bypass code. Please try again.', 'error');
-        }
-      } else {
-        // Verify via actual Firebase Phone confirmation
-        if (!confirmationResult) {
-          showToast('No active verification session found. Please request a new OTP.', 'error');
-          return;
-        }
+      // Verify via actual Firebase Phone confirmation
+      await confirmationResult.confirm(otpCode);
 
-        await confirmationResult.confirm(otpCode);
-
-        const updatedProfile = {
-          ...userProfile,
-          phone,
-          phoneVerified: true,
-          updatedAt: new Date()
-        };
-        
-        await setDbDoc('users', userId, updatedProfile);
-        showToast('Mobile number verified successfully!', 'success');
-        
-        if ((window as any).recaptchaVerifier) {
-          try {
-            (window as any).recaptchaVerifier.clear();
-            (window as any).recaptchaVerifier = null;
-          } catch (e) {}
-        }
-        
-        onSuccess(updatedProfile);
+      const updatedProfile = {
+        ...userProfile,
+        phone,
+        phoneVerified: true,
+        updatedAt: new Date()
+      };
+      
+      await setDbDoc('users', userId, updatedProfile);
+      showToast('Mobile number verified successfully!', 'success');
+      
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+          (window as any).recaptchaVerifier = null;
+        } catch (e) {}
       }
+      
+      onSuccess(updatedProfile);
     } catch (err) {
       console.error('OTP confirmation failed:', err);
-      showToast('Invalid OTP code. Please check and try again.', 'error');
+      showToast('Invalid OTP code. Please check your SMS and try again.', 'error');
     } finally {
       setVerifying(false);
     }
@@ -231,17 +197,6 @@ export default function OtpVerificationModal({
           </button>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            {/* Show fallback code box ONLY if region restriction blocked actual SMS delivery */}
-            {fallbackOtp && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3.5 text-xs text-left">
-                <span className="font-bold block text-[9px] uppercase tracking-wider text-amber-600">SMS Region Policy Block</span>
-                <strong className="text-xl font-mono tracking-widest text-amber-700 block mt-1.5 text-center">{fallbackOtp}</strong>
-                <span className="text-[9px] text-stone-500 block mt-1.5 leading-relaxed">
-                  Google Cloud Console prevents Firebase from sending SMS to your country by default. Use this testing bypass code to verify.
-                </span>
-              </div>
-            )}
-
             <input
               type="text"
               maxLength={6}
