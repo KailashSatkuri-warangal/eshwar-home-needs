@@ -1122,6 +1122,18 @@
       "role": "staff",
       "createdAt": "2026-08-20T02:59:10.647Z",
       "updatedAt": "2026-08-20T02:59:10.647Z"
+    },
+    {
+      "uid": "Gvl7IouFx7MiGB5vZcLTT025vfN2",
+      "tempOtpCode": null,
+      "tempOtpExpires": null,
+      "email": "ksatkuri@gmail.com",
+      "displayName": "karthik",
+      "role": "customer",
+      "phoneVerified": true,
+      "createdAt": "2026-08-24T15:43:50.574Z",
+      "updatedAt": "2026-08-24T15:47:24.531Z",
+      "phone": "8309740722"
     }
   ]
 }

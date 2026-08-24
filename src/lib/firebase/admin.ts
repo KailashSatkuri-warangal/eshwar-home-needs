@@ -7,16 +7,17 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
+export const isLiveAdmin = !!(privateKey && 
+                             clientEmail && 
+                             projectId && 
+                             privateKey.includes('-----BEGIN PRIVATE KEY-----') && 
+                             !privateKey.includes('your_private_key_here') &&
+                             !privateKey.includes('your_firebase_api_key_here'));
+
 let app: any;
 
 if (!getApps().length) {
-  // Only attempt certificate initialization if credentials look real and are not dummy placeholders
-  const hasRealCreds = privateKey && 
-                       clientEmail && 
-                       projectId && 
-                       privateKey.includes('-----BEGIN PRIVATE KEY-----') && 
-                       !privateKey.includes('your_private_key_here') &&
-                       !privateKey.includes('your_firebase_api_key_here');
+  const hasRealCreds = isLiveAdmin;
 
   if (hasRealCreds) {
     try {
@@ -24,7 +25,7 @@ if (!getApps().length) {
         credential: cert({
           projectId,
           clientEmail,
-          privateKey: privateKey.replace(/\\n/g, '\n'),
+          privateKey: privateKey!.replace(/\\n/g, '\n'),
         }),
         storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
