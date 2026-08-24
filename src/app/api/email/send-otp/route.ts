@@ -59,7 +59,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email address is required for verification.' }, { status: 400 });
     }
 
-    // 1. Generate 6-digit verification code
+    // 1. Enforce phone uniqueness — one number per account only
+    if (phone && userId && userId !== 'guest_checkout' && userId !== 'guest_scrap') {
+      let phoneTaken = false;
+
+      if (isLiveAdmin) {
+        const snapshot = await adminDb.collection('users')
+          .where('phone', '==', phone)
+          .where('phoneVerified', '==', true)
+          .get();
+        phoneTaken = snapshot.docs.some(doc => doc.id !== userId);
+      } else {
+        const dbData = getLocalDb();
+        const allUsers = dbData.users || [];
+        phoneTaken = allUsers.some((u: any) => u.uid !== userId && u.phone === phone && u.phoneVerified === true);
+      }
+
+      if (phoneTaken) {
+        return NextResponse.json({ 
+          error: 'This phone number is already verified by another account. Each number can only be linked to one account.' 
+        }, { status: 409 });
+      }
+    }
+
+    // 2. Generate 6-digit verification code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min expiry
 

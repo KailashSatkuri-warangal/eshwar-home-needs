@@ -4,6 +4,7 @@ const host = process.env.SMTP_HOST || 'smtp.gmail.com';
 const port = parseInt(process.env.SMTP_PORT || '465');
 const user = process.env.SMTP_USER;
 const pass = process.env.SMTP_PASS;
+const fromAddress = process.env.SMTP_FROM || user;
 
 const isSmtpConfigured = user && pass;
 
@@ -32,9 +33,9 @@ export async function sendEmail({
   text: string;
 }) {
   if (transporter) {
-    console.log(`Sending SMTP email to ${to}...`);
+    console.log(`Sending SMTP email from ${fromAddress} to ${to}...`);
     await transporter.sendMail({
-      from: `"ESHwar Home Needs" <${user}>`,
+      from: `"ESHwar Home Needs" <${fromAddress}>`,
       to,
       subject,
       text,
@@ -43,10 +44,11 @@ export async function sendEmail({
     console.log(`✅ Email sent successfully to ${to}`);
   } else {
     console.log('\n=================== [MOCK EMAIL SERVICE] ===================');
+    console.log(`From:    orders@eshwarhomeneeds.com`);
     console.log(`To:      ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body:    ${text}`);
     console.log('============================================================\n');
-    console.log('💡 TIP: Set SMTP_USER and SMTP_PASS in .env to send real emails to your mobile!');
+    console.log('💡 TIP: Set SMTP_USER and SMTP_PASS in .env.local to send real emails!');
   }
 }
