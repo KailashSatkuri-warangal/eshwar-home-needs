@@ -79,6 +79,16 @@ export default function WholesalePage() {
   const handleQuoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Enforce mobile verification gate for RFQ (B2B Sell/Buy)
+    if (!user) {
+      showToast('Please sign in or register to verify your mobile number and request a B2B quotation.', 'info');
+      return;
+    }
+    if (!user.phoneVerified) {
+      showToast('Mobile verification is required before requesting a B2B quote. Please verify your phone number in your Account Profile.', 'error');
+      return;
+    }
+
     if (rfqItems.length === 0) {
       showToast('Please add at least one product to the RFQ list.', 'error');
       return;

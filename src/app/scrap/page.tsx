@@ -129,6 +129,16 @@ export default function ScrapPage() {
   const handlePickupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Enforce mobile verification gate for Selling
+    if (!user) {
+      showToast('Please sign in or register to verify your mobile number and book a doorstep scrap pickup.', 'info');
+      return;
+    }
+    if (!user.phoneVerified) {
+      showToast('Mobile verification is required before booking a scrap pickup. Please verify your phone number in your Account Profile.', 'error');
+      return;
+    }
+
     if (!name || !phone || !street || !pincode || !preferredDate) {
       showToast('Please fill all required customer and schedule details.', 'error');
       return;

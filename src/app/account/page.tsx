@@ -48,6 +48,10 @@ export default function AccountPage() {
   const [submittingSecurity, setSubmittingSecurity] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
 
+  // Phone Editing states
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [editPhoneInput, setEditPhoneInput] = useState('');
+
   // Fetch histories in real-time when user changes
   useEffect(() => {
     if (!user) return;
@@ -291,6 +295,33 @@ export default function AccountPage() {
       showToast('Failed to submit reference.', 'error');
     } finally {
       setSubmittingUtrMap(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+    if (!phoneRegex.test(editPhoneInput.trim())) {
+      showToast('Please enter a valid 10-digit mobile number.', 'error');
+      return;
+    }
+
+    try {
+      const updatedProfile = {
+        ...user,
+        phone: editPhoneInput.trim(),
+        phoneVerified: false, // Reset verification flag on edits!
+        updatedAt: new Date()
+      };
+      
+      await setDbDoc('users', user.uid, updatedProfile);
+      updateUserProfile(updatedProfile);
+      setIsEditingPhone(false);
+      showToast('Phone number updated! Please verify your new number.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update phone number.', 'error');
     }
   };
 
@@ -936,22 +967,71 @@ export default function AccountPage() {
                       <p>Full Name: <strong className="text-stone-800">{user.displayName}</strong></p>
                       <p>Registered Email: <strong className="text-stone-800">{user.email}</strong></p>
                       <p>Verification Role: <strong className="text-stone-800 capitalize">{user.role}</strong></p>
-                      {user.phone && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>Registered Phone: <strong className="text-stone-800">{user.phone}</strong></span>
-                          {user.phoneVerified ? (
-                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Verified</span>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Unverified</span>
+                      {isEditingPhone ? (
+                        <form onSubmit={handleSavePhone} className="flex items-center gap-2 max-w-xs pt-1.5">
+                          <input
+                            type="text"
+                            required
+                            placeholder="10-digit mobile number"
+                            value={editPhoneInput}
+                            onChange={(e) => setEditPhoneInput(e.target.value.replace(/\D/g, ''))}
+                            className="bg-stone-50 border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-copper w-full font-semibold"
+                          />
+                          <button
+                            type="submit"
+                            className="bg-copper hover:bg-copper-dark text-white font-bold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer whitespace-nowrap"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingPhone(false)}
+                            className="text-stone-400 hover:text-stone-600 text-[10px] font-bold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span>Phone Number: <strong className="text-stone-800">{user.phone || 'Not registered'}</strong></span>
+                          {user.phone ? (
+                            <>
+                              {user.phoneVerified ? (
+                                <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Verified</span>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase">Unverified</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowOtpModal(true)}
+                                    className="text-[10px] text-copper font-bold hover:underline cursor-pointer"
+                                  >
+                                    Verify Now
+                                  </button>
+                                </div>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => setShowOtpModal(true)}
-                                className="text-[10px] text-copper font-bold hover:underline cursor-pointer"
+                                onClick={() => {
+                                  setEditPhoneInput(user.phone || '');
+                                  setIsEditingPhone(true);
+                                }}
+                                className="text-[10px] text-stone-400 hover:text-stone-650 font-bold underline cursor-pointer"
                               >
-                                Verify Now
+                                Edit
                               </button>
-                            </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditPhoneInput('');
+                                setIsEditingPhone(true);
+                              }}
+                              className="text-[10px] text-copper font-bold hover:underline cursor-pointer"
+                            >
+                              Add Phone Number
+                            </button>
                           )}
                         </div>
                       )}
