@@ -119,3 +119,9 @@ npm run build
 * **Customer Dashboard Sync:** Customer order statuses, wholesale quote replies, and doorstep scrap booking collections sync automatically in real-time under `/account`.
 * **Live Analytics Command Center:** Refactored the back-office dashboard (`/admin`) to run on reactive hooks. Total sales revenue counters, weekly volume bar graphs, low stock counts, and quotation alerts calculate and repaint instantly as database records update. Included a pulsing *`Live Sync Active`* status badge.
 * **Interactive Commodity Value Ticker:** Re-engineered the scrap categories rates board (`/scrap`) to run as a live ticker. The pricing engine polls rates and simulates market price ticks every 5 seconds, causing rates to fluctuate dynamically (+-0.4%) with green/red trend badges updating live on the screen.
+
+---
+
+## 10. Live Notifications & Simulated Transactional Emails
+* **Real-time Admin Notifications Center:** Integrated a live-listening Bell Notification center dropdown inside the admin panel toolbar (`src/app/admin/layout.tsx`). The layout subscribes to the database `notifications` collection reactively. When customers submit new orders or scrap requests, a red unread counter badge updates on the bell, and a subtle chime audio alert is played automatically.
+* **Transactional Email Simulation Client:** Created a beautiful "Simulated Email Client" inbox overlay modal in the checkout success view (`src/app/checkout/page.tsx`). Clicking **"View Email Invoice"** opens a realistic webmail client showing a fully styled B2C order confirmation receipt email, including items list breakdowns, taxes/freight calculations, shipping addresses, and payment instructions.

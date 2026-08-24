@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const [showMockPaymentModal, setShowMockPaymentModal] = useState(false);
   const [pendingMockOrder, setPendingMockOrder] = useState<Order | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Form Fields
   const [name, setName] = useState(user?.displayName || '');
@@ -335,6 +336,15 @@ export default function CheckoutPage() {
             >
               <FileText className="w-4 h-4" /> Download GST Invoice
             </button>
+            <button
+              onClick={() => {
+                setShowEmailModal(true);
+                showToast('Email invoice preview loaded!', 'info');
+              }}
+              className="flex-1 bg-stone-900 hover:bg-black text-white font-bold py-2.5 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              📧 View Email Invoice
+            </button>
             <Link
               href="/shop"
               className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold py-2.5 rounded-lg text-xs block text-center"
@@ -343,6 +353,124 @@ export default function CheckoutPage() {
             </Link>
           </div>
         </main>
+
+        {/* Simulated Email Confirmation Modal */}
+        {showEmailModal && orderCreated && (
+          <div className="fixed inset-0 bg-black/60 z-55 flex items-center justify-center p-4">
+            <div className="bg-white border border-stone-200 rounded-3xl max-w-2xl w-full text-left overflow-hidden shadow-2xl flex flex-col h-[80vh] animate-in fade-in zoom-in-95 duration-200">
+              {/* Modal Header */}
+              <div className="bg-stone-950 text-white p-4 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 bg-rose-500 rounded-full"></div>
+                  <span className="text-xs font-bold font-mono tracking-wider">Simulated Email Client — Inbox</span>
+                </div>
+                <button
+                  onClick={() => setShowEmailModal(false)}
+                  className="text-stone-400 hover:text-white font-bold text-xs bg-stone-800 hover:bg-stone-700 px-2.5 py-1 rounded cursor-pointer"
+                >
+                  Close Client
+                </button>
+              </div>
+
+              {/* Email Header */}
+              <div className="p-4 border-b border-stone-100 bg-stone-50 space-y-2 text-xs shrink-0">
+                <div>
+                  <span className="text-stone-400 font-bold uppercase text-[9px] block">Subject</span>
+                  <span className="text-stone-800 font-bold text-sm">🛒 Order Confirmed &amp; Dispatched! Invoice #{orderCreated.id.slice(0, 8).toUpperCase()}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-stone-400 font-bold uppercase text-[9px] block">From</span>
+                    <span className="text-stone-700 font-semibold">ESHwar Home Needs &lt;orders@eshwarhomeneeds.com&gt;</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 font-bold uppercase text-[9px] block">To</span>
+                    <span className="text-stone-700 font-semibold">{orderCreated.customerDetails.name} &lt;{orderCreated.customerDetails.email}&gt;</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Body Content */}
+              <div className="p-6 overflow-y-auto bg-stone-50 flex-grow font-sans space-y-6">
+                {/* Outer HTML Email Container */}
+                <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm max-w-xl mx-auto space-y-6 text-xs text-stone-600">
+                  {/* Branding Banner */}
+                  <div className="border-b-4 border-copper pb-4 text-center">
+                    <h1 className="text-xl font-extrabold text-stone-900 font-serif">ESHwar Home Needs</h1>
+                    <p className="text-[10px] text-stone-400 uppercase tracking-widest mt-1">Smart Retail, Wholesale &amp; Metal Scrap Solutions</p>
+                  </div>
+
+                  {/* Salutation */}
+                  <div className="space-y-2">
+                    <p className="font-bold text-stone-800 text-sm">Dear {orderCreated.customerDetails.name},</p>
+                    <p className="leading-relaxed">
+                      Thank you for shopping with ESHwar Home Needs! Your order has been placed successfully and is currently being processed. An invoice is attached to this confirmation.
+                    </p>
+                  </div>
+
+                  {/* Receipt Details Table */}
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-stone-800 uppercase tracking-wider text-[10px] border-b pb-1.5">
+                      Order Summary (Invoice: #{orderCreated.id.slice(0, 8).toUpperCase()})
+                    </h3>
+                    <div className="divide-y divide-stone-100">
+                      {orderCreated.items.map((item, idx) => (
+                        <div key={idx} className="py-2 flex justify-between gap-4">
+                          <div>
+                            <span className="font-bold text-stone-800">{item.name}</span>
+                            <span className="text-[10px] text-stone-400 block mt-0.5">{item.quantity} {item.unit} × {formatCurrency(item.price)}</span>
+                          </div>
+                          <span className="font-bold text-stone-900 shrink-0">{formatCurrency(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-stone-200 pt-3 space-y-1.5 text-stone-500 font-medium">
+                      <div className="flex justify-between">
+                        <span>Subtotal (Excl. GST)</span>
+                        <span>{formatCurrency(orderCreated.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>GST (CGST + SGST)</span>
+                        <span>{formatCurrency(orderCreated.gst)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Delivery Shipping Charges</span>
+                        <span>{orderCreated.deliveryCharge === 0 ? 'FREE' : formatCurrency(orderCreated.deliveryCharge)}</span>
+                      </div>
+                      <div className="flex justify-between text-stone-900 font-bold border-t pt-2 text-sm">
+                        <span>Grand Total (Paid)</span>
+                        <span className="text-copper">{formatCurrency(orderCreated.grandTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shipping Coordinates */}
+                  <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-stone-800 uppercase text-[9px]">Delivery Address</h4>
+                      <p className="leading-tight text-stone-500 font-semibold">{orderCreated.customerDetails.shippingAddress.name}</p>
+                      <p className="leading-tight text-stone-500">{orderCreated.customerDetails.shippingAddress.street}</p>
+                      <p className="leading-tight text-stone-500">{orderCreated.customerDetails.shippingAddress.city}, {orderCreated.customerDetails.shippingAddress.pincode}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-stone-800 uppercase text-[9px]">Payment Method</h4>
+                      <p className="font-bold text-stone-700 capitalize">{orderCreated.paymentDetails.method}</p>
+                      <p className="text-stone-500 font-mono">Reference: {orderCreated.paymentDetails.transactionId || 'Awaiting Collection'}</p>
+                    </div>
+                  </div>
+
+                  {/* Footer Notes */}
+                  <div className="border-t pt-4 text-center text-[10px] text-stone-400 space-y-1.5">
+                    <p>Our agent will contact you shortly regarding delivery routing.</p>
+                    <p className="font-bold text-stone-500">ESHwar Home Needs — Hanumakonda, Telangana. WhatsApp: +91 99494 08061</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Footer />
       </div>
     );

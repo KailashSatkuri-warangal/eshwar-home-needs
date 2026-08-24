@@ -1,18 +1,51 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   BarChart3, Box, FileText, Scale, Settings, Users, 
-  ShieldAlert, LogOut, Landmark, RotateCw 
+  ShieldAlert, LogOut, Landmark, RotateCw, Bell, Check
 } from 'lucide-react';
+import { subscribeDbCollection, setDbDoc } from '@/lib/services/db';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userLoading, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Subscribe to real-time notification alerts
+  useEffect(() => {
+    const unsubscribe = subscribeDbCollection('notifications', (data) => {
+      const sorted = [...data].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setNotifications(sorted);
+
+      // Play alert sound if a new unread notification arrives
+      const unread = sorted.filter(n => !n.read).length;
+      if (unread > 0) {
+        try {
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav');
+          audio.volume = 0.4;
+          audio.play();
+        } catch (e) {}
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    const unread = notifications.filter(n => !n.read);
+    for (const notif of unread) {
+      await setDbDoc('notifications', notif.id, { ...notif, read: true });
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // 1. Loading Checks
   if (userLoading) {
@@ -131,15 +164,69 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 flex flex-col overflow-y-auto h-screen pb-16">
         
         {/* Header Toolbar */}
-        <header className="bg-white border-b border-stone-200 h-14 flex items-center justify-between px-6 py-4">
+        <header className="bg-white border-b border-stone-200 h-14 flex items-center justify-between px-6 py-4 relative">
           <span className="text-xs font-bold text-stone-500">
             Welcome, {user.displayName} ({isAdminUser ? 'Administrator' : 'Staff Representative'})
           </span>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse" />
-            <span className="text-[10px] font-bold text-emerald-800 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-              System Live
-            </span>
+          
+          <div className="flex items-center gap-4">
+            {/* Real-time Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-1.5 hover:bg-stone-100 rounded-full transition-colors relative cursor-pointer text-stone-600 block"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-600 text-white rounded-full text-[8px] font-extrabold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Dropdown Panel */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2.5 w-80 bg-white border border-stone-200 rounded-2xl shadow-xl z-55 text-xs text-stone-600 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="p-3 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
+                    <span className="font-bold text-stone-900 font-serif">Notifications Center</span>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[10px] font-bold text-copper hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Check className="w-3 h-3" /> Mark all read
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="max-h-64 overflow-y-auto divide-y divide-stone-150">
+                    {notifications.map((notif) => (
+                      <div key={notif.id} className={`p-3 space-y-1 transition-colors ${!notif.read ? 'bg-copper/5 font-semibold text-stone-900' : ''}`}>
+                        <div className="flex justify-between items-center">
+                          <span className="capitalize text-[9px] text-copper tracking-wider font-bold">{notif.type}</span>
+                          <span className="text-[9px] text-stone-400 font-medium">
+                            {notif.createdAt?.seconds ? new Date(notif.createdAt.seconds * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-tight font-sans text-stone-600">{notif.message}</p>
+                      </div>
+                    ))}
+                    {notifications.length === 0 && (
+                      <div className="p-8 text-center text-stone-400 font-medium">
+                        No notifications received.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse" />
+              <span className="text-[10px] font-bold text-emerald-800 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                System Live
+              </span>
+            </div>
           </div>
         </header>
 
