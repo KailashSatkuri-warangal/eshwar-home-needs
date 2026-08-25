@@ -1,7 +1,4 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy Node.js app to Azure Web App - eshwarhomeneeds-instance
+name: Build and deploy Next.js app to Azure Web App - eshwarhomeneeds-instance
 
 on:
   push:
@@ -12,35 +9,56 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read #This is required for actions/checkout
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js version
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js standalone app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDmCD5hpSXfjdriCV0qHX0cOahKYOEM_kE' }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "eshwar-home-needs-92d6c.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "eshwar-home-needs-92d6c"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "eshwar-home-needs-92d6c.firebasestorage.app"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "672525700558"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:672525700558:web:0c95cab14eedb7531f6f9f"
+          NEXT_PUBLIC_WHATSAPP_NUMBER: "919949408061"
+          NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_TR7tAfXCNzKyXk"
+
+      - name: Prepare standalone artifact
+        run: |
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public || true
+          cp data-local.json .next/standalone/data-local.json || true
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: .next/standalone
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write
+      contents: read
 
     steps:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
           name: node-app
+          path: ./app-deploy
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -55,5 +73,4 @@ jobs:
         with:
           app-name: 'eshwarhomeneeds-instance'
           slot-name: 'Production'
-          package: .
-          
+          package: ./app-deploy
