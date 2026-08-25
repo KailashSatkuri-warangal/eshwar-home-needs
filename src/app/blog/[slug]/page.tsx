@@ -1,83 +1,105 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { Metadata } from 'next';
 import Navbar from '@/components/ui/Navbar';
 import Footer from '@/components/ui/Footer';
+import { BlogPost, Product } from '@/types';
+import { getDbDocs } from '@/lib/services/db';
 import { MOCK_BLOG_POSTS, MOCK_PRODUCTS } from '@/lib/mockData';
 import { ArticleJsonLd, FaqJsonLd, BreadcrumbJsonLd } from '@/components/seo/JsonLd';
 import {
   Clock, Calendar, Share2, ArrowLeft, Tag,
   CheckCircle2, Sparkles, MessageCircle, HelpCircle,
-  ExternalLink, ShoppingBag, ArrowRight
+  ExternalLink, ShoppingBag, ArrowRight, RefreshCw, BookOpen
 } from 'lucide-react';
 
-interface Props {
-  params: Promise<{ slug: string }>;
-}
+export default function BlogDetailPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
+  const router = useRouter();
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const post = MOCK_BLOG_POSTS.find((p) => p.slug === slug);
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!post) {
-    return {
-      title: 'Article Not Found | ESHwar Home Needs',
-    };
+  useEffect(() => {
+    async function loadPost() {
+      if (!slug) return;
+      setLoading(true);
+
+      try {
+        // 1. Check dynamic database first
+        const docs = await getDbDocs('blogs');
+        if (docs && docs.length > 0) {
+          const found = (docs as BlogPost[]).find(
+            (b) => b.slug === slug || b.id === slug
+          );
+          if (found) {
+            setPost(found);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch from database, checking mock:', err);
+      }
+
+      // 2. Check seed mock data fallback
+      const mockFound = MOCK_BLOG_POSTS.find((p) => p.slug === slug || p.id === slug);
+      if (mockFound) {
+        setPost(mockFound);
+      } else {
+        setPost(null);
+      }
+      setLoading(false);
+    }
+
+    loadPost();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-cream">
+        <Navbar />
+        <div className="flex-grow flex flex-col items-center justify-center p-12 text-center">
+          <RefreshCw className="w-8 h-8 text-copper animate-spin mb-3" />
+          <p className="text-stone-600 text-sm font-medium">Loading article...</p>
+        </div>
+        <Footer />
+      </div>
+    );
   }
 
-  const imageUrl = post.featuredImage.startsWith('http')
-    ? post.featuredImage
-    : `https://www.eshwarhomeneeds.shop${post.featuredImage}`;
-
-  return {
-    title: `${post.title} | ESHwar Home Needs`,
-    description: post.excerpt,
-    keywords: post.keywords,
-    authors: [{ name: post.author || 'Kailash Satkuri' }],
-    openGraph: {
-      title: post.title,
-      description: post.excerpt,
-      url: `https://www.eshwarhomeneeds.shop/blog/${post.slug}`,
-      siteName: 'ESHwar Home Needs',
-      type: 'article',
-      publishedTime: new Date(post.publishedAt).toISOString(),
-      modifiedTime: new Date(post.updatedAt).toISOString(),
-      authors: [post.author || 'Kailash Satkuri'],
-      tags: post.tags,
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: post.imageCaption || post.title,
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: post.title,
-      description: post.excerpt,
-      images: [imageUrl],
-    },
-    alternates: {
-      canonical: `https://www.eshwarhomeneeds.shop/blog/${post.slug}`,
-    },
-  };
-}
-
-export default async function BlogDetailPage({ params }: Props) {
-  const { slug } = await params;
-  const post = MOCK_BLOG_POSTS.find((p) => p.slug === slug);
-
   if (!post) {
-    notFound();
+    return (
+      <div className="flex flex-col min-h-screen bg-cream">
+        <Navbar />
+        <main className="flex-grow max-w-2xl mx-auto px-4 py-20 text-center space-y-4">
+          <div className="w-16 h-16 bg-amber-100 text-copper rounded-full flex items-center justify-center mx-auto">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-stone-900 font-serif">Article Not Found</h1>
+          <p className="text-sm text-stone-500 max-w-md mx-auto">
+            The article you are looking for might have been moved or is still being published.
+          </p>
+          <div className="pt-4">
+            <Link
+              href="/blog"
+              className="bg-copper hover:bg-copper-dark text-white text-xs font-bold px-6 py-3 rounded-xl transition-all shadow-sm"
+            >
+              Browse All Kitchen Guides
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
-  // Get related products if any
   const relatedProducts = (post.relatedProductIds || [])
     .map((id: string) => MOCK_PRODUCTS.find((p) => p.id === id))
-    .filter(Boolean);
+    .filter(Boolean) as Product[];
 
   const shareText = encodeURIComponent(
     `Check out this guide: "${post.title}" on ESHwar Home Needs!\nhttps://www.eshwarhomeneeds.shop/blog/${post.slug}`
@@ -181,7 +203,7 @@ export default async function BlogDetailPage({ params }: Props) {
 
           {/* Main Article Body */}
           <div className="prose prose-stone max-w-none text-stone-800 leading-relaxed text-sm sm:text-base space-y-6">
-            {post.content.split('\n\n').map((paragraph: string, pIdx: number) => {
+            {(post.content || '').split('\n\n').map((paragraph: string, pIdx: number) => {
               const trimmed = paragraph.trim();
 
               // Subheading H2
