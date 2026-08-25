@@ -9,9 +9,9 @@ import { useApp } from '@/context/AppContext';
 import { ScrapMaterialType, ScrapStatus, ScrapRequest } from '@/types';
 import { db } from '@/lib/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
-import { 
-  Scale, Upload, Sparkles, Calendar, Clock, RotateCw, 
-  MapPin, CheckCircle2, AlertCircle, Trash2 
+import {
+  Scale, Upload, Sparkles, Calendar, Clock, RotateCw,
+  MapPin, CheckCircle2, AlertCircle, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -24,13 +24,13 @@ export default function ScrapPage() {
   const [name, setName] = useState(user?.displayName || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [email, setEmail] = useState(user?.email || '');
-  
+
   // Shipping details
   const [street, setStreet] = useState('');
-  const [city, setCity] = useState('Bengaluru');
-  const [state, setState] = useState('Karnataka');
+  const [city, setCity] = useState('Warangal');
+  const [state, setState] = useState('Telangana');
   const [pincode, setPincode] = useState('');
-  
+
   // Schedule
   const [preferredDate, setPreferredDate] = useState('');
   const [preferredTime, setPreferredTime] = useState('10:00 - 13:00');
@@ -105,10 +105,10 @@ export default function ScrapPage() {
       const result = await response.json();
 
       setAiResult(result);
-      
+
       // Auto-fill form parameters based on AI outputs
       setMaterial(result.material);
-      
+
       // Parse average weight from range (e.g. "3.5 - 4.5 kg" -> 4)
       const avgWeightMatch = result.weightRange.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
       if (avgWeightMatch && avgWeightMatch[1] && avgWeightMatch[2]) {
@@ -269,7 +269,7 @@ export default function ScrapPage() {
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
-        
+
         {/* Intro banner */}
         <div className="bg-gradient-to-br from-scrap to-scrap-dark rounded-3xl text-white p-8 sm:p-12 relative overflow-hidden shadow-sm">
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />
@@ -291,7 +291,7 @@ export default function ScrapPage() {
 
         {/* 2. Photo Uploader & Booking Form */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          
+
           {/* Uploader & AI Estimator (2/5 width) */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-xs space-y-4">
