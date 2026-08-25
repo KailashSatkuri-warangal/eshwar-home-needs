@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   BarChart3, Box, FileText, Scale, Settings, Users, 
-  ShieldAlert, LogOut, Landmark, RotateCw, Bell, Check
+  ShieldAlert, LogOut, Landmark, RotateCw, Bell, Check, Sparkles
 } from 'lucide-react';
 import { subscribeDbCollection, setDbDoc } from '@/lib/services/db';
 
@@ -94,6 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       { name: 'Wholesale Quotes', href: '/admin/quotes', icon: FileText },
     ] : []),
     { name: 'Scrap Requests', href: '/admin/scrap', icon: Scale },
+    { name: 'AI Blog Studio', href: '/admin/blogs', icon: Sparkles },
   ];
 
   return (

@@ -8,12 +8,14 @@ import {
   MOCK_CATEGORIES,
   MOCK_PRODUCTS,
   MOCK_SCRAP_RATES,
-  MOCK_REVIEWS
+  MOCK_REVIEWS,
+  MOCK_BLOG_POSTS
 } from '@/lib/mockData';
 import { useApp } from '@/context/AppContext';
 import {
   Scale, Landmark, Award, ShieldCheck, HeartHandshake,
-  ArrowRight, Star, Quote, CheckCircle2, MessageCircle
+  ArrowRight, Star, Quote, CheckCircle2, MessageCircle,
+  BookOpen, Clock
 } from 'lucide-react';
 import WhatsAppCTA from '@/components/ui/WhatsAppCTA';
 
@@ -386,6 +388,71 @@ export default function HomePage() {
                 We don't just sell kitchenware; we buy back old worn-out steel, copper, and brass scraps, supporting local sustainability and circular economy.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6.5 LATEST BLOG GUIDES (SEO & Internal Linking) */}
+      <section className="py-16 bg-white px-4 sm:px-6 lg:px-8 border-t border-stone-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-copper flex items-center gap-1.5 mb-1">
+                <BookOpen className="w-4 h-4" /> Cooking &amp; Metal Guides
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-stone-900 font-serif">
+                Latest from the ESHwar Journal
+              </h2>
+              <p className="text-xs text-stone-500 mt-1">
+                Discover culinary advice, Ayurvedic copper science, and metal recycling tips from our team
+              </p>
+            </div>
+            <Link
+              href="/blog"
+              className="inline-flex items-center gap-1 text-xs font-bold text-copper hover:text-copper-dark group"
+            >
+              Explore All Guides
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {MOCK_BLOG_POSTS.slice(0, 3).map((post) => (
+              <Link
+                key={post.id}
+                href={`/blog/${post.slug}`}
+                className="bg-stone-50 hover:bg-white border border-stone-200/80 rounded-3xl overflow-hidden shadow-2xs hover:shadow-md transition-all duration-300 flex flex-col group"
+              >
+                <div className="relative h-48 w-full overflow-hidden bg-stone-100">
+                  <img
+                    src={post.featuredImage}
+                    alt={post.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-2xs">
+                    {post.category}
+                  </span>
+                </div>
+
+                <div className="p-6 flex-grow flex flex-col justify-between space-y-3">
+                  <div className="space-y-2">
+                    <span className="text-[11px] text-stone-400 font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {post.readTimeMinutes} min read
+                    </span>
+                    <h3 className="font-bold text-stone-900 text-sm sm:text-base group-hover:text-copper transition-colors line-clamp-2 leading-snug">
+                      {post.title}
+                    </h3>
+                    <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                      {post.excerpt}
+                    </p>
+                  </div>
+
+                  <span className="text-xs font-bold text-copper flex items-center gap-1 pt-2">
+                    Read Article <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

@@ -287,3 +287,35 @@ export interface Notification {
   read: boolean;
   createdAt: any;
 }
+
+export interface CartState {
+  items: CartItem[];
+  itemCount: number;
+  subtotal: number;
+  gst: number;
+  deliveryCharge: number;
+  grandTotal: number;
+  isWholesale: boolean;
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string; // Markdown / HTML
+  featuredImage: string;
+  imageCaption?: string;
+  category: 'Cookware Guides' | 'Health & Copper' | 'Scrap & Recycling' | 'Kitchen Tips' | 'Wholesale Insights';
+  tags: string[];
+  keywords: string[];
+  author: string;
+  published: boolean;
+  publishedAt: any;
+  updatedAt: any;
+  readTimeMinutes: number;
+  views: number;
+  faqs?: Array<{ question: string; answer: string }>;
+  relatedProductIds?: string[];
+}
+

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   Menu, X, ShoppingCart, User, Search, Scale, Landmark,
-  Flame, ChevronDown, HelpCircle, FileText
+  Flame, ChevronDown, HelpCircle, FileText, BookOpen
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -124,6 +124,9 @@ export default function Navbar() {
             <Link href="/scrap" className="text-sm font-semibold text-stone-700 hover:text-copper transition-colors flex items-center gap-1">
               <Scale className="w-4 h-4 text-scrap" /> Sell Scrap
             </Link>
+            <Link href="/blog" className="text-sm font-semibold text-stone-700 hover:text-copper transition-colors flex items-center gap-1">
+              <BookOpen className="w-3.5 h-3.5 text-copper" /> Guides &amp; Blog
+            </Link>
           </nav>
 
           {/* Action icons (Cart, Account, Wholesale toggle) */}
@@ -227,6 +230,13 @@ export default function Navbar() {
               className="block px-3 py-2 text-sm font-semibold text-scrap hover:bg-teal-50 rounded-md flex items-center gap-1.5"
             >
               <Scale className="w-4 h-4" /> Sell Old Scrap Material
+            </Link>
+            <Link
+              href="/blog"
+              onClick={() => setIsOpen(false)}
+              className="block px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 hover:text-copper rounded-md flex items-center gap-1.5"
+            >
+              <BookOpen className="w-4 h-4 text-copper" /> Kitchen Guides &amp; Blog
             </Link>
           </div>
 

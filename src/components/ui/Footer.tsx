@@ -62,6 +62,9 @@ export default function Footer() {
               <Link href="/scrap" className="hover:text-scrap-light transition-colors text-scrap-light">Sell Old Scrap Online</Link>
             </li>
             <li>
+              <Link href="/blog" className="hover:text-copper transition-colors text-amber-400">Kitchen Guides &amp; Blog</Link>
+            </li>
+            <li>
               <Link href="/account" className="hover:text-copper transition-colors">My Customer Account</Link>
             </li>
           </ul>

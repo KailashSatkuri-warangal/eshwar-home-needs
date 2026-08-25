@@ -1,4 +1,4 @@
-import { Product, Category, ScrapRate, Review } from '@/types';
+import { Product, Category, ScrapRate, Review, BlogPost } from '@/types';
 
 export const MOCK_CATEGORIES: Category[] = [
   {
@@ -781,4 +781,182 @@ export const MOCK_REVIEWS: Review[] = [
   },
 ];
 
+export const MOCK_BLOG_POSTS: BlogPost[] = [
+  {
+    id: 'triply-stainless-steel-cookware-guide',
+    slug: 'triply-stainless-steel-cookware-guide',
+    title: 'Tri-ply Stainless Steel Cookware: Why It Outperforms Non-Stick in Indian Kitchens',
+    excerpt: 'Discover why professional chefs and home cooks across Telangana and Andhra Pradesh are replacing toxic Teflon non-stick pans with heavy 3-ply stainless steel.',
+    featuredImage: '/shop/IMG_1626636968308250350 (1).jpg',
+    imageCaption: 'Heavy tri-ply stainless steel kadai with encapsulated aluminum core',
+    category: 'Cookware Guides',
+    tags: ['Triply Cookware', 'Stainless Steel', 'Healthy Cooking', 'Kitchen Essentials'],
+    keywords: ['triply cookware price', 'tri ply stainless steel kadai', 'non stick vs triply steel', 'best cookware for indian cooking', 'triply cookware hanumakonda warangal'],
+    author: 'Kailash Satkuri',
+    published: true,
+    publishedAt: new Date('2026-08-15'),
+    updatedAt: new Date('2026-08-20'),
+    readTimeMinutes: 6,
+    views: 1420,
+    faqs: [
+      {
+        question: 'What makes Tri-ply cookware different from regular steel vessels?',
+        answer: 'Tri-ply construction sandwiches a pure aluminum core between an inner food-grade 304 stainless steel layer and an outer magnetic 430 steel layer. This eliminates hotspots, prevents burning, and provides even heat distribution across the base and sidewalls.'
+      },
+      {
+        question: 'Is Tri-ply cookware compatible with induction cooktops?',
+        answer: 'Yes! The outer layer of all ESHwar Home Needs Tri-ply cookware uses magnetic 430 grade stainless steel, making it 100% compatible with induction stoves, gas burners, and electric hotplates.'
+      },
+      {
+        question: 'How do you prevent food from sticking to stainless steel pans?',
+        answer: 'Preheat your dry stainless steel pan over medium flame for 2 minutes until water droplets dance on the surface (the Leidenfrost effect). Then add oil and allow it to shimmer before placing food.'
+      }
+    ],
+    content: `
+## Why Traditional Indian Cooking Demands Tri-ply Cookware
+
+For decades, Indian households relied on either heavy cast iron or thin aluminum cookware. While non-stick Teflon cookware gained popularity in the 2000s, health-conscious families are now discovering the hidden risks of chemical non-stick coatings when subjected to high-heat tadkas, deep frying, and acidic tomato-based gravies.
+
+**Tri-ply stainless steel** represents the pinnacle of modern culinary engineering, combining the health safety of surgical steel with the rapid thermal conductivity of aluminum.
+
+---
+
+### The Anatomy of a 3-Ply Vessel
+
+1. **Inner Layer (SS 304 Food Grade):** 100% rust-free, non-reactive with tamarind, tomato, and lemon. Safe for cooking and long storage.
+2. **Middle Core (Heavy Gauge Aluminum):** Spreads heat 9x faster than steel alone, eliminating hot spots that cause milk, dal, and curries to burn at the bottom.
+3. **Outer Base (SS 430 Magnetic Steel):** Heavy-duty magnetic steel that makes the vessel compatible with all induction cooktops and high-intensity gas burners.
+
+---
+
+### Comparison: Tri-ply Stainless Steel vs. Non-Stick Cookware
+
+| Feature | Tri-ply Stainless Steel | Teflon Non-Stick |
+| :--- | :--- | :--- |
+| **Lifespan** | 20+ Years (Lifetime) | 1 to 2 Years |
+| **Chemical Safety** | 100% Non-toxic, Zero PFOA | Degrades over 260°C |
+| **Metal Spatula Safe** | Yes, 100% scratch-resistant | No, destroys coating |
+| **Dishwasher Safe** | Yes | No |
+| **Heat Retention** | Exceptional | Poor |
+
+---
+
+### Maintenance & Care Tips
+- **For tough stains or burned food:** Boil water with 1 tablespoon of baking soda and vinegar for 5 minutes, then wipe clean with a soft sponge.
+- **To maintain mirror shine:** Wipe dry immediately after washing with a microfiber cloth to prevent mineral water spots.
+
+Visit **ESHwar Home Needs** in Hanumakonda, Telangana or browse our catalog online for certified ISI-grade Tri-ply Cookware sets.
+    `,
+    relatedProductIds: ['triply-kadai-24cm', 'triply-frypan-22cm', 'triply-saucepan-18cm']
+  },
+  {
+    id: 'pure-copper-water-bottle-ayurvedic-benefits',
+    slug: 'pure-copper-water-bottle-ayurvedic-benefits',
+    title: '10 Proven Health Benefits of Drinking Water from Pure Copper Vessels (Tamra Jal)',
+    excerpt: 'Learn the ancient Ayurvedic science and modern microbiology behind storing water in 100% pure hammered copper bottles overnight.',
+    featuredImage: '/shop/IMG_2440041935501381787.jpg',
+    imageCaption: '100% pure jointless hammered copper water bottle with leakproof brass cap',
+    category: 'Health & Copper',
+    tags: ['Copper Bottle', 'Ayurveda', 'Tamra Jal', 'Immunity Boost', 'Digestive Health'],
+    keywords: ['copper water bottle benefits', 'how to clean copper bottle', 'tamra jal health benefits', 'buy pure copper bottle online india', 'copper vessels warangal'],
+    author: 'Kailash Satkuri',
+    published: true,
+    publishedAt: new Date('2026-08-18'),
+    updatedAt: new Date('2026-08-22'),
+    readTimeMinutes: 5,
+    views: 2180,
+    faqs: [
+      {
+        question: 'How long should water be kept in a copper bottle before drinking?',
+        answer: 'Ayurveda recommends storing room-temperature water in a copper vessel for 6 to 8 hours (ideally overnight) to allow the oligodynamic effect to naturally sterilize and mineralize the water.'
+      },
+      {
+        question: 'How do you identify real pure copper from coated fake bottles?',
+        answer: 'Real copper develops a natural dark greenish/brown patina over time due to oxidation when exposed to air and moisture. It also has a distinct metallic resonance and warm reddish-brown hue.'
+      }
+    ],
+    content: `
+## The Science of Tamra Jal (Copper-Infused Water)
+
+In ancient Ayurvedic medicine, drinking water stored in a copper vessel—known as **Tamra Jal**—is classified as a natural method to balance all three doshas: *Vata, Pitta, and Kapha*.
+
+Modern scientific studies have verified the **oligodynamic effect**: copper ions possess natural antimicrobial and antifungal properties that neutralize waterborne bacteria like *E. coli* and *Salmonella* within hours.
+
+---
+
+### Top Health Benefits of Pure Copper Water
+1. **Boosts Digestive System Health:** Copper reduces stomach inflammation, kills harmful bacteria, and aids in peristalsis (smooth bowel movements).
+2. **Supports Weight Management:** Helps the body break down excess fat deposits more efficiently.
+3. **Enhances Skin Health & Melanin Production:** Essential for cell regeneration and fighting free radicals that cause premature aging.
+4. **Regulates Thyroid Function:** Copper is a vital trace mineral required for proper thyroid hormone synthesis.
+5. **Natural Antimicrobial Action:** Keeps your drinking water fresh and pathogen-free without boiling or chemical filters.
+
+---
+
+### How to Clean & Maintain Your Copper Bottle
+- Never use steel wool or abrasive detergents inside copper bottles.
+- Once a week, mix **lemon juice and rock salt** (or tamarind pulp) with warm water, shake inside the bottle for 1 minute, and rinse thoroughly.
+
+Explore our collection of authentic **100% pure hammered copper bottles and dispensers** at ESHwar Home Needs.
+    `,
+    relatedProductIds: ['copper-bottle-1l', 'copper-jug-2l', 'copper-glass-set-6']
+  },
+  {
+    id: 'doorstep-metal-scrap-rates-guide-telangana',
+    slug: 'doorstep-metal-scrap-rates-guide-telangana',
+    title: 'How Live Metal Scrap Rates Are Calculated: Complete Doorstep Pickup Guide',
+    excerpt: 'A complete breakdown of copper, brass, stainless steel, and aluminum scrap valuation with certified digital scale weighing at your doorstep.',
+    featuredImage: '/shop/IMG_1497965090816371006 (1).jpg',
+    imageCaption: 'Doorstep scrap metal collection with real-time commodity pricing ticker',
+    category: 'Scrap & Recycling',
+    tags: ['Scrap Metal', 'Recycling', 'Copper Scrap Rate', 'Doorstep Scrap Collection', 'Warangal Scrap'],
+    keywords: ['scrap metal rate per kg telangana', 'copper scrap price today', 'doorstep scrap pickup warangal', 'sell brass scrap online', 'scrap rate per kg hanumakonda'],
+    author: 'Kailash Satkuri',
+    published: true,
+    publishedAt: new Date('2026-08-20'),
+    updatedAt: new Date('2026-08-24'),
+    readTimeMinutes: 4,
+    views: 960,
+    faqs: [
+      {
+        question: 'How do you ensure accurate weight for scrap items?',
+        answer: 'Our field collection executives carry government-certified, tamper-proof electronic digital scales calibrated to 10-gram precision. You inspect the weight live on the scale display.'
+      },
+      {
+        question: 'How quickly do I receive payout after scrap pickup?',
+        answer: 'Payouts are executed instantly on the spot via UPI (Google Pay, PhonePe, Paytm) or cash as soon as the weight verification is complete.'
+      }
+    ],
+    content: `
+## Sustainable Metal Recycling with Guaranteed Honest Valuation
+
+Old kitchen utensils, copper pipes, brass lamps, and obsolete machinery often sit forgotten in storage. Rather than selling to uncertified local kabadiwallahs with inaccurate mechanical beam scales, **ESHwar Home Needs** provides a transparent, digital doorstep scrap collection service.
+
+---
+
+### Daily Metal Commodity Rate Indicators
+
+| Metal Category | Typical Rate Range (per Kg) | Primary Sources |
+| :--- | :--- | :--- |
+| **Pure Red Copper (Armature / Wire)** | ₹650 – ₹720 / kg | Motor windings, heavy pipes, pure utensils |
+| **Heavy Brass (Pital)** | ₹440 – ₹490 / kg | Old pooja items, taps, heavy urlis |
+| **Stainless Steel (SS 304 Grade)** | ₹55 – ₹70 / kg | Kitchen utensils, sinks, cookware |
+| **Aluminium (Cast / Sheet)** | ₹130 – ₹170 / kg | Pressure cookers, frames, vessels |
+
+*Note: Live rates fluctuate based on international commodity market movements and purity grades.*
+
+---
+
+### 3 Steps to Book a Doorstep Pickup
+1. **Estimate:** Check today's live rate ticker on our Scrap Portal.
+2. **Schedule:** Pick your convenient date, time slot, and address coordinates.
+3. **Verify & Earn:** Our executive arrives with a certified digital scale and transfers funds instantly to your UPI ID.
+
+Book your pickup today or upload photos to our **AI Scrap Predictor** for an instant valuation!
+    `,
+    relatedProductIds: ['ss-tope-set', 'copper-bottle-1l', 'brass-urli-12in']
+  }
+];
+
 export default MOCK_PRODUCTS;
+
