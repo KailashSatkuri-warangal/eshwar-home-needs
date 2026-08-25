@@ -45,6 +45,7 @@ jobs:
             package-lock.json
             node_modules
             data-local.json
+            server.js
             next.config.ts
             tsconfig.json
 
