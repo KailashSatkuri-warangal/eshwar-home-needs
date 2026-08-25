@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js version
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
@@ -21,10 +21,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js standalone app
+      - name: Build Next.js
         run: npm run build
         env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDmCD5hpSXfjdriCV0qHX0cOahKYOEM_kE' }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyDmCD5hpSXfjdriCV0qHX0cOahKYOEM_kE"
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "eshwar-home-needs-92d6c.firebaseapp.com"
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: "eshwar-home-needs-92d6c"
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "eshwar-home-needs-92d6c.firebasestorage.app"
@@ -33,18 +33,21 @@ jobs:
           NEXT_PUBLIC_WHATSAPP_NUMBER: "919949408061"
           NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_TR7tAfXCNzKyXk"
 
-      - name: Prepare standalone artifact
-        run: |
-          mkdir -p .next/standalone/.next
-          cp -r .next/static .next/standalone/.next/static
-          cp -r public .next/standalone/public || true
-          cp data-local.json .next/standalone/data-local.json || true
+      - name: Prune devDependencies to keep package lightweight
+        run: npm prune --production
 
-      - name: Upload artifact for deployment job
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .next/standalone
+          path: |
+            .next
+            public
+            package.json
+            package-lock.json
+            node_modules
+            data-local.json
+            next.config.ts
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,7 +57,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: node-app
