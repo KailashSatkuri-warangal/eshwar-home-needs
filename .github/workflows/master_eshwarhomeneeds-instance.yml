@@ -33,17 +33,19 @@ jobs:
           NEXT_PUBLIC_WHATSAPP_NUMBER: "919949408061"
           NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_TR7tAfXCNzKyXk"
 
-      - name: Copy static files to standalone folder
+      - name: Package standalone bundle into zip
         run: |
+          mkdir -p .next/standalone/.next
           cp -R .next/static .next/standalone/.next/
           cp -R public .next/standalone/ || true
           cp data-local.json .next/standalone/ || true
+          cd .next/standalone && zip -q -r ../../release.zip .
 
-      - name: Upload artifact for deployment
+      - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: .next/standalone
+          name: release-pkg
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -53,12 +55,11 @@ jobs:
       contents: read
 
     steps:
-      - name: Download artifact
+      - name: Download zip artifact
         uses: actions/download-artifact@v4
         with:
-          name: node-app
-          path: ./app-deploy
-      
+          name: release-pkg
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -72,4 +73,4 @@ jobs:
         with:
           app-name: 'eshwarhomeneeds-instance'
           slot-name: 'Production'
-          package: ./app-deploy
+          package: release.zip
