@@ -33,9 +33,6 @@ jobs:
           NEXT_PUBLIC_WHATSAPP_NUMBER: "919949408061"
           NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_TR7tAfXCNzKyXk"
 
-      - name: Prune devDependencies to keep package lightweight
-        run: npm prune --production
-
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
@@ -43,11 +40,13 @@ jobs:
           path: |
             .next
             public
+            src
             package.json
             package-lock.json
             node_modules
             data-local.json
             next.config.ts
+            tsconfig.json
 
   deploy:
     runs-on: ubuntu-latest
