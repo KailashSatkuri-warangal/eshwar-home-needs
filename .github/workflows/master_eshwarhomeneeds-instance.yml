@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
+      - name: Build Next.js standalone
         run: npm run build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyDmCD5hpSXfjdriCV0qHX0cOahKYOEM_kE"
@@ -33,21 +33,17 @@ jobs:
           NEXT_PUBLIC_WHATSAPP_NUMBER: "919949408061"
           NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_TR7tAfXCNzKyXk"
 
+      - name: Copy static files to standalone folder
+        run: |
+          cp -R .next/static .next/standalone/.next/
+          cp -R public .next/standalone/ || true
+          cp data-local.json .next/standalone/ || true
+
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: |
-            .next
-            public
-            src
-            package.json
-            package-lock.json
-            node_modules
-            data-local.json
-            server.js
-            next.config.ts
-            tsconfig.json
+          path: .next/standalone
 
   deploy:
     runs-on: ubuntu-latest
